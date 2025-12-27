@@ -2,710 +2,756 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>리얼 우주 중력 골프 (Power, Height & Curve)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>리얼 우주 중력 골프 v0.1.1 (Online)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Noto+Sans+KR:wght@300;500;700&display=swap" rel="stylesheet">
     <style>
-        body { margin: 0; overflow: hidden; background-color: #000; }
-        .font-space { font-family: 'Courier New', Courier, monospace; }
+        body { margin: 0; overflow: hidden; background-color: #050505; font-family: 'Noto Sans KR', sans-serif; touch-action: none; user-select: none; -webkit-user-select: none; }
+        .font-sci { font-family: 'Orbitron', sans-serif; }
+        .hidden { display: none !important; }
+        .fade-in { animation: fadeIn 0.5s ease-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
         
-        /* 전체 게이지 컨테이너 */
-        #gauge-container-group {
-            position: absolute;
-            bottom: 40px;
-            left: 50%;
-            transform: translateX(-50%);
-            display: flex;
-            align-items: flex-end;
-            gap: 15px;
-            display: none; /* 샷 할때만 표시 */
+        .btn-menu {
+            background: linear-gradient(135deg, rgba(30, 58, 138, 0.4) 0%, rgba(88, 28, 135, 0.4) 100%);
+            border: 1px solid rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            transition: all 0.2s;
         }
+        .btn-menu:active { transform: scale(0.95); background: rgba(59, 130, 246, 0.6); }
 
-        /* --- 세로 게이지 (높이) --- */
-        #gauge-height-wrapper {
-            position: relative;
-            width: 30px;
-            height: 120px;
-            background: #222;
-            border: 2px solid #888;
-            border-radius: 8px;
-            overflow: hidden;
-        }
-        #gauge-height-fill {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            width: 100%;
-            height: 0%;
-            background: linear-gradient(0deg, #3b82f6 0%, #a855f7 100%);
-            opacity: 0.8;
-            transition: opacity 0.3s;
-        }
-        #gauge-height-cursor {
-            position: absolute;
-            bottom: 0%;
-            left: 0;
-            width: 100%;
-            height: 4px;
-            background: #fff;
-            border: 1px solid #000;
-            box-shadow: 0 0 5px #fff;
-            z-index: 10;
-        }
-        #height-label {
-            position: absolute;
-            top: -20px;
-            left: 50%;
-            transform: translateX(-50%);
-            font-size: 10px;
-            color: #a855f7;
-            font-weight: bold;
-            white-space: nowrap;
-        }
+        /* 게이지 & 미니맵 */
+        #gauge-container-group { position: absolute; bottom: 120px; left: 50%; transform: translateX(-50%); display: none; gap: 15px; z-index: 50; align-items: flex-end; width: 90%; max-width: 500px; justify-content: center; background: rgba(0,0,0,0.6); padding: 15px; border-radius: 20px; border: 1px solid #555; }
+        #gauge-height-wrapper { width: 30px; height: 140px; background: #111; border: 2px solid #888; border-radius: 8px; position: relative; overflow: hidden; flex-shrink: 0; }
+        #gauge-height-fill { width: 100%; height: 0%; bottom: 0; position: absolute; background: linear-gradient(0deg, #2563eb, #9333ea); transition: height 0.05s linear; }
+        #gauge-height-cursor { position: absolute; bottom: 0%; left: 0; width: 100%; height: 4px; background: #fff; z-index: 10; box-shadow: 0 0 5px #fff; }
+        #gauge-bar { width: 100%; height: 30px; background: #111; border: 2px solid #888; border-radius: 15px; position: relative; overflow: hidden; }
+        #gauge-power-fill { height: 100%; width: 0%; position: absolute; top: 0; left: 0; background: linear-gradient(90deg, #4ade80, #facc15, #ef4444); }
+        #gauge-center-line { position: absolute; top: 0; left: 50%; width: 2px; height: 100%; background: rgba(255,255,255,0.8); z-index: 5; }
+        .cursor-indicator { position: absolute; background: #fff; box-shadow: 0 0 8px #fff; z-index: 10; border: 1px solid #000; width: 4px; height: 30px; top:-2px; }
 
-        /* --- 가로 게이지 (파워/커브) --- */
-        #gauge-horizontal-wrapper {
-            position: relative;
-            width: 400px;
-            height: 70px; 
-        }
-        #gauge-bar {
-            position: relative;
-            width: 100%;
-            height: 24px;
-            background: #222;
-            border: 2px solid #888;
-            border-radius: 12px;
-            overflow: hidden;
-            margin-top: 10px;
-        }
-        #gauge-power-fill {
-            position: absolute;
-            top: 0;
-            left: 0;
-            height: 100%;
-            width: 0%;
-            background: linear-gradient(90deg, #4ade80 0%, #facc15 100%);
-            opacity: 0.8;
-            transition: opacity 0.3s;
-        }
-        #gauge-center-line {
-            position: absolute;
-            top: 0;
-            left: 50%;
-            width: 2px;
-            height: 100%;
-            background: #fff;
-            z-index: 5;
-            box-shadow: 0 0 5px #fff;
-        }
-        .gauge-label {
-            position: absolute;
-            top: 38px;
-            font-size: 10px;
-            color: #666;
-            font-weight: bold;
-        }
-        #label-left { left: 5%; color: #ef4444; }
-        #label-center { left: 50%; transform: translateX(-50%); color: #fff; }
-        #label-right { right: 5%; color: #3b82f6; }
-        #gauge-cursor {
-            position: absolute;
-            top: -4px;
-            left: 0%;
-            width: 4px;
-            height: 32px;
-            background: #fff;
-            border: 1px solid #000;
-            box-shadow: 0 0 5px #fff;
-            z-index: 10;
-            transform: translateX(-50%);
-        }
+        #minimap-container { position: absolute; top: 80px; right: 20px; width: 140px; height: 140px; background: rgba(0, 0, 0, 0.9); border: 2px solid #666; border-radius: 50%; overflow: hidden; z-index: 50; display: none; }
+        #minimap-canvas { width: 100%; height: 100%; display: block; }
+        
+        .mobile-controls { display: none; position: absolute; bottom: 30px; z-index: 60; width: 100%; justify-content: space-between; padding: 0 30px; pointer-events: none; }
+        .control-btn { pointer-events: auto; width: 70px; height: 70px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.3); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; color: white; backdrop-filter: blur(4px); transition: 0.1s; user-select: none; }
+        .control-btn:active { background: rgba(255,255,255,0.3); transform: scale(0.9); }
+        .control-btn.shot-btn { width: 90px; height: 90px; background: rgba(234, 179, 8, 0.2); border-color: rgba(234, 179, 8, 0.5); font-weight: bold; font-size: 18px; }
+        .control-btn.shot-btn:active { background: rgba(234, 179, 8, 0.5); }
+        
+        #item-slots { position: absolute; top: 240px; right: 20px; display: none; flex-direction: column; gap: 8px; z-index: 40; }
+        .item-box { width: 50px; height: 50px; background: rgba(0,0,0,0.6); border: 1px solid #444; border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; cursor: pointer; font-size: 10px; pointer-events: auto; }
+        
+        #loader { position: fixed; inset: 0; background: #000; z-index: 100; display: flex; justify-content: center; align-items: center; color: white; flex-direction: column; }
+        .spinner { width: 40px; height: 40px; border: 4px solid #333; border-top: 4px solid #fff; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 10px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        /* 상태 텍스트 */
-        #gauge-status {
-            position: absolute;
-            top: -30px;
-            width: 100%;
-            text-align: center;
-            color: #fbbf24;
-            font-weight: bold;
-            font-size: 14px;
-            text-shadow: 1px 1px 2px black;
-        }
+        /* 멀티플레이 상태바 */
+        #multi-status { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); font-size: 12px; color: #4ade80; z-index: 60; display: none; background: rgba(0,0,0,0.7); padding: 5px 15px; border-radius: 20px; border: 1px solid #4ade80; }
     </style>
 </head>
-<body class="text-white select-none">
+<body class="text-white">
 
-    <!-- UI Overlay -->
-    <div id="ui-layer" class="absolute inset-0 pointer-events-none flex flex-col justify-between p-4 z-10">
-        <!-- Top HUD -->
-        <div class="flex justify-between items-start">
-            <div class="bg-slate-900/80 p-3 rounded-lg border border-slate-700 backdrop-blur-sm">
-                <h1 class="text-xl font-bold text-yellow-400 font-space shadow-black drop-shadow-md">🪐 <span id="planet-name">MARS FIELD</span></h1>
-                <div class="mt-1 text-xs text-blue-300">중력: <span id="gravity-display">0.38</span>g</div>
-            </div>
-            
-            <div class="bg-slate-900/80 p-3 rounded-lg border border-slate-700 backdrop-blur-sm text-right">
-                <div class="text-lg font-bold">PAR: <span id="par-display">4</span></div>
-                <div class="text-xs text-slate-400">SHOTS: <span id="shot-count" class="text-green-400">0</span></div>
-            </div>
-        </div>
+    <div id="multi-status">🟢 ONLINE: 1 Players</div>
 
-        <!-- Center Message -->
-        <div id="message-area" class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center hidden pointer-events-auto z-20">
-            <div class="bg-black/80 p-8 rounded-2xl border border-yellow-500/50 backdrop-blur-md shadow-2xl">
-                <h2 id="message-title" class="text-4xl font-bold mb-2 text-yellow-400 drop-shadow-lg">HOLE IN!</h2>
-                <p id="message-desc" class="text-lg mb-6 text-slate-200">나이스 샷!</p>
-                <button id="next-btn" class="bg-yellow-500 hover:bg-yellow-600 text-black font-bold py-3 px-8 rounded-full shadow-lg transition transform hover:scale-105 pointer-events-auto">
-                    다음 코스
-                </button>
-            </div>
+    <div id="loader">
+        <div class="spinner"></div>
+        <p>CONNECTING SATELLITE...</p>
+    </div>
+
+    <!-- 로비 -->
+    <div id="lobby-screen" class="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/90 backdrop-blur-md fade-in hidden">
+        <div class="text-center mb-6 mt-10">
+            <h1 class="text-4xl md:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 font-sci mb-2">
+                GRAVITY GOLF
+            </h1>
+            <p class="text-slate-400 text-sm md:text-lg font-sci tracking-widest">ONLINE MULTIPLAYER v0.1.1</p>
         </div>
         
-        <!-- Shot Feedback Message -->
-        <div id="shot-feedback" class="absolute top-1/3 left-1/2 transform -translate-x-1/2 text-center hidden z-20">
-             <h2 class="text-6xl font-black italic text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 via-red-500 to-pink-500 drop-shadow-2xl" style="-webkit-text-stroke: 2px white;">CURVE!</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-4xl px-6 pb-10 overflow-y-auto" style="max-height: 70vh;">
+            <button onclick="GameApp.selectMode('SPEED')" class="btn-menu p-6 rounded-2xl flex items-center gap-4 group">
+                <div class="text-4xl">⚡</div>
+                <div class="text-left">
+                    <h3 class="text-xl font-bold font-sci text-yellow-400">SPEED GOLF</h3>
+                    <p class="text-xs text-slate-300">Single Player</p>
+                </div>
+            </button>
+            <button onclick="GameApp.selectMode('CASUAL')" class="btn-menu p-6 rounded-2xl flex items-center gap-4 group">
+                <div class="text-4xl">🎒</div>
+                <div class="text-left">
+                    <h3 class="text-xl font-bold font-sci text-green-400">CASUAL GOLF</h3>
+                    <p class="text-xs text-slate-300">With Items</p>
+                </div>
+            </button>
+            <button onclick="GameApp.selectMode('CHALLENGE')" class="btn-menu p-6 rounded-2xl flex items-center gap-4 group">
+                <div class="text-4xl">🏆</div>
+                <div class="text-left">
+                    <h3 class="text-xl font-bold font-sci text-red-400">CHALLENGE</h3>
+                    <p class="text-xs text-slate-300">5-Hole Run</p>
+                </div>
+            </button>
+            <button onclick="GameApp.startRealMulti()" class="btn-menu p-6 rounded-2xl flex items-center gap-4 group relative overflow-hidden">
+                <div class="absolute inset-0 bg-blue-500/10 animate-pulse"></div>
+                <div class="text-4xl">🌍</div>
+                <div class="text-left">
+                    <h3 class="text-xl font-bold font-sci text-blue-400">MULTIPLAYER</h3>
+                    <p class="text-xs text-slate-300">Real-Time Online</p>
+                </div>
+            </button>
+        </div>
+    </div>
+
+    <!-- 매칭 -->
+    <div id="matching-screen" class="hidden absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/95">
+        <div class="text-6xl mb-4 animate-bounce">📡</div>
+        <h2 class="text-xl font-bold font-sci text-blue-400 animate-pulse">SEARCHING ROOM...</h2>
+        <p id="match-msg" class="text-slate-500 text-sm mt-2">Connecting to server...</p>
+    </div>
+
+    <!-- 인게임 HUD -->
+    <div id="in-game-ui" class="absolute inset-0 pointer-events-none hidden z-10">
+        <div class="absolute top-4 left-4 pointer-events-auto flex items-center gap-2 bg-black/60 p-2 rounded-lg backdrop-blur-sm z-50">
+            <span class="text-2xl">🪐</span>
+            <div>
+                <h2 id="hud-planet-name" class="text-sm font-bold font-sci text-yellow-400 leading-none">PLANET</h2>
+                <p id="hud-planet-info" class="text-[10px] text-slate-300 font-mono">1.0g | Par 4</p>
+            </div>
         </div>
 
-        <!-- Controls Help -->
-        <div class="absolute top-20 left-4 text-xs text-slate-400 bg-black/50 p-2 rounded">
-            <p>⌨️ <span class="text-white font-bold">A / D</span> : 에임(시야) 조절</p>
-            <p>⚡ <span class="text-white font-bold">SPACE (4단계)</span> : 시작 → 파워 → 높이(세로) → 커브</p>
-            <p>🔄 <span class="text-white font-bold">R</span> : 공 위치 초기화</p>
+        <button onclick="ThreeScene.resetBall()" class="absolute top-4 left-1/2 transform -translate-x-1/2 pointer-events-auto bg-red-500/80 p-2 rounded-full text-xs font-bold border border-red-400 shadow-lg active:scale-95 transition z-50">
+            ↺ RESET
+        </button>
+
+        <div class="absolute top-4 right-4 text-right bg-black/60 p-2 rounded-lg backdrop-blur-sm z-50">
+            <div class="text-2xl font-bold font-sci text-white leading-none"><span id="hud-shots">0</span></div>
+            <div class="text-[10px] text-slate-400">SHOTS</div>
+            <div id="hud-timer" class="text-sm text-yellow-400 font-mono mt-1">00:00</div>
         </div>
 
-        <!-- Gauge UI Group -->
-        <div id="gauge-container-group">
-            
-            <!-- 세로: 높이 -->
+        <div id="gauge-container-group" class="pointer-events-auto">
             <div id="gauge-height-wrapper">
-                <div id="height-label">HEIGHT</div>
+                <div class="absolute top-[-20px] w-full text-center text-[9px] font-bold text-purple-400">ANG</div>
                 <div id="gauge-height-fill"></div>
                 <div id="gauge-height-cursor"></div>
             </div>
-
-            <!-- 가로: 파워 & 커브 -->
-            <div id="gauge-horizontal-wrapper">
-                <div id="gauge-status">SPACE를 눌러 샷 시작</div>
+            <div style="position: relative; flex-grow: 1;">
+                <div id="gauge-status" class="absolute top-[-25px] w-full text-center font-bold text-yellow-400 text-xs bg-black/70 rounded px-2 border border-yellow-500/30">TAP SHOT</div>
                 <div id="gauge-bar">
                     <div id="gauge-center-line"></div>
                     <div id="gauge-power-fill"></div>
-                    <div id="gauge-cursor"></div>
+                    <div id="gauge-cursor" class="cursor-indicator" style="left:0%;"></div>
                 </div>
-                <span id="label-left" class="gauge-label">HOOK (좌)</span>
-                <span id="label-center" class="gauge-label">STRAIGHT</span>
-                <span id="label-right" class="gauge-label">SLICE (우)</span>
+                <div class="flex justify-between text-[9px] font-bold mt-1 px-1 text-slate-400 font-mono">
+                    <span>HOOK</span>
+                    <span>STRAIGHT</span>
+                    <span>SLICE</span>
+                </div>
             </div>
+        </div>
+
+        <div id="minimap-container"><canvas id="minimap-canvas"></canvas></div>
+
+        <div id="item-slots">
+            <div class="item-box" onclick="GameApp.useItem('POWER')"><span class="text-xl">💪</span><span class="text-[8px]">PWR</span></div>
+            <div class="item-box" onclick="GameApp.useItem('GUIDE')"><span class="text-xl">👁️</span><span class="text-[8px]">AIM</span></div>
+            <div class="item-box" onclick="GameApp.useItem('BRAKE')"><span class="text-xl">⚓</span><span class="text-[8px]">STOP</span></div>
+        </div>
+
+        <div class="mobile-controls flex" id="mobile-controls">
+            <div class="flex gap-4 items-end pb-4">
+                <button class="control-btn" id="btn-left">◀</button>
+                <button class="control-btn" id="btn-right">▶</button>
+            </div>
+            <div class="flex items-end pb-4">
+                <button class="control-btn shot-btn" id="btn-shot">SHOT</button>
+            </div>
+        </div>
+
+        <div id="shot-feedback" class="absolute top-[30%] left-1/2 transform -translate-x-1/2 text-center hidden pointer-events-none w-full z-50">
+             <h2 class="text-5xl font-black italic text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-orange-500 to-red-600 drop-shadow-2xl" style="-webkit-text-stroke: 1px white;">NICE!</h2>
+        </div>
+    </div>
+
+    <!-- 결과 -->
+    <div id="result-screen" class="hidden absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/90 backdrop-blur-md fade-in">
+        <h1 class="text-4xl md:text-6xl font-black text-yellow-400 font-sci mb-6">COMPLETE</h1>
+        <div class="bg-slate-800/80 p-6 rounded-2xl border border-slate-600 text-center modal-box shadow-2xl">
+            <div class="flex justify-between mb-4"><span class="text-slate-400">Shots</span><span class="text-2xl font-bold text-white" id="res-shots">0</span></div>
+            <div class="flex justify-between mb-6"><span class="text-slate-400">Score</span><span class="text-3xl font-black text-yellow-400" id="res-score">0</span></div>
+            <button id="btn-next-level" onclick="GameApp.nextLevel()" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl mb-3">NEXT 🚀</button>
+            <button onclick="GameApp.returnToLobby()" class="w-full bg-slate-700 hover:bg-slate-600 text-slate-200 font-bold py-3 rounded-xl">LOBBY</button>
         </div>
     </div>
 
     <div id="canvas-container" class="absolute inset-0 z-0"></div>
 
-    <script>
-        // --- 1. Three.js Setup ---
-        const container = document.getElementById('canvas-container');
-        const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x0a0a0a);
-        scene.fog = new THREE.Fog(0x0a0a0a, 50, 500);
+    <!-- Firebase SDK (Modular) -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, getDocs, doc, onSnapshot, updateDoc, setDoc, query, where, limit } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
-        const renderer = new THREE.WebGLRenderer({ antialias: true });
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.shadowMap.enabled = true;
-        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-        container.appendChild(renderer.domElement);
+        const firebaseConfig = JSON.parse(__firebase_config);
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
-        // Lights
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
-        scene.add(ambientLight);
+        let myUid = null;
+        let currentRoomId = null;
+        let roomUnsubscribe = null;
 
-        const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
-        dirLight.position.set(50, 100, 50);
-        dirLight.castShadow = true;
-        scene.add(dirLight);
-
-        // --- 2. Game Variables ---
-        // GAUGE_POWER: 1단계 (가로 - 파워)
-        // GAUGE_HEIGHT: 2단계 (세로 - 높이)
-        // GAUGE_CURVE: 3단계 (가로 - 커브)
-        const STATE = { AIMING: 0, GAUGE_POWER: 1, GAUGE_HEIGHT: 2, GAUGE_CURVE: 3, MOVING: 4, HOLED: 5 };
-        let gameState = STATE.AIMING;
-        
-        let ball, terrain, goal;
-        let aimArrow;
-        let aimAngle = 0; 
-        let cameraDistance = 30;
-        let cameraHeight = 15;
-
-        // Physics Tuning
-        let ballVelocity = new THREE.Vector3(0, 0, 0);
-        let gravity = 9.8 * 0.38; 
-        let friction = 0.98; 
-        let restitution = 0.7; 
-        let wallRestitution = 0.9; 
-
-        // Gauge Logic Variables
-        // Horizontal (Power/Curve)
-        let gaugeCursorPos = 0; 
-        let gaugeDirection = 1; 
-        // Vertical (Height)
-        let heightCursorPos = 0;
-        let heightDirection = 1;
-
-        // Values to Store
-        let gaugePowerVal = 0; 
-        let gaugeHeightVal = 0;
-        let gaugeCurveVal = 0;
-        
-        let gaugeSpeed = 1.5; 
-        
-        // Stage Data
-        const STAGES = [
-            {
-                name: "MARS CRATER",
-                gravity: 0.38, // Mars
-                par: 3,
-                color: 0x8c3b28, // Reddish
-                startPos: { x: 0, y: 2, z: 40 },
-                holePos: { x: 0, y: 0, z: -40 },
-                obstacles: [
-                    { x: -15, y: 0, z: 0, w: 10, h: 5, d: 10 },
-                    { x: 15, y: 0, z: 0, w: 10, h: 5, d: 10 }
-                ]
-            },
-            {
-                name: "MOON DUST",
-                gravity: 0.16, // Moon
-                par: 4,
-                color: 0x555555, // Grey
-                startPos: { x: -30, y: 2, z: 60 },
-                holePos: { x: 30, y: 0, z: -60 },
-                obstacles: [
-                    { x: 0, y: 0, z: 0, w: 20, h: 10, d: 20 },
-                    { x: -20, y: 0, z: 30, w: 10, h: 4, d: 10 }
-                ]
-            },
-            {
-                name: "JUPITER GRAVITY",
-                gravity: 2.5, // Jupiter (Heavy!)
-                par: 5,
-                color: 0xc88b3a, // Orange/Brown
-                startPos: { x: 0, y: 2, z: 80 },
-                holePos: { x: 0, y: 0, z: -80 },
-                obstacles: [
-                    { x: -10, y: 0, z: 40, w: 30, h: 2, d: 5 },
-                    { x: 10, y: 0, z: 0, w: 30, h: 2, d: 5 },
-                    { x: -10, y: 0, z: -40, w: 30, h: 2, d: 5 }
-                ]
+        // --- Planet DB ---
+        const PlanetDB = (() => {
+            const THEMES = [0x4ade80, 0xc2410c, 0x94a3b8, 0xbfdbfe, 0x7f1d1d];
+            const planets = [];
+            for(let i=0; i<300; i++) {
+                const mapSize = 4000;
+                const pathPoints = [new THREE.Vector3(0,0,mapSize/2-200)];
+                const segments = 4 + (i%3); 
+                for(let j=1; j<segments; j++) pathPoints.push(new THREE.Vector3((Math.random()-0.5)*2500, 0, (mapSize/2-200) - ((mapSize-400)*(j/segments))));
+                pathPoints.push(new THREE.Vector3(0,0,-(mapSize/2-200)));
+                planets.push({
+                    id: i, name: `Planet-${i+1}`, gravity: 0.2 + (Math.random()*1.5), par: 3 + (i%3), color: THEMES[i%5],
+                    pathPoints, startPos: pathPoints[0], holePos: pathPoints[pathPoints.length-1], width: 150 + Math.random()*100 
+                });
             }
-        ];
-        let currentStageIdx = 0;
-        let shots = 0;
+            return {
+                get: (id) => planets[id % planets.length],
+                getRandom: () => planets[Math.floor(Math.random()*planets.length)],
+                getFiveRandom: () => { const s=[...planets].sort(()=>0.5-Math.random()); return s.slice(0,5); }
+            };
+        })();
 
-        // --- 3. Object Creation Helpers ---
+        // --- Game App ---
+        window.GameApp = {
+            state: 'LOBBY', mode: null, currentStage: null, challengeQueue: [], challengeCurrent: 0,
+            items: { POWER: 3, GUIDE: 3, BRAKE: 3 }, startTime: 0, timerInterval: null,
 
-        function createStarField() {
-            const geometry = new THREE.BufferGeometry();
-            const vertices = [];
-            for (let i = 0; i < 3000; i++) {
-                vertices.push((Math.random() - 0.5) * 1000, (Math.random() - 0.5) * 1000, (Math.random() - 0.5) * 1000);
-            }
-            geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
-            const material = new THREE.PointsMaterial({ color: 0xffffff, size: 1.5, transparent: true });
-            const stars = new THREE.Points(geometry, material);
-            scene.add(stars);
-        }
-        createStarField();
-
-        function createTerrain(stageData) {
-            const geometry = new THREE.BoxGeometry(100, 10, 200); 
-            const material = new THREE.MeshStandardMaterial({ color: stageData.color, roughness: 0.8 });
-            terrain = new THREE.Mesh(geometry, material);
-            terrain.position.y = -5;
-            terrain.receiveShadow = true;
-            scene.add(terrain);
-
-            const wallMat = new THREE.MeshStandardMaterial({ color: 0x222222 });
-            const w1 = new THREE.Mesh(new THREE.BoxGeometry(2, 10, 200), wallMat); w1.position.set(51, 0, 0); scene.add(w1);
-            const w2 = new THREE.Mesh(new THREE.BoxGeometry(2, 10, 200), wallMat); w2.position.set(-51, 0, 0); scene.add(w2);
-            const w3 = new THREE.Mesh(new THREE.BoxGeometry(104, 10, 2), wallMat); w3.position.set(0, 0, 101); scene.add(w3);
-            const w4 = new THREE.Mesh(new THREE.BoxGeometry(104, 10, 2), wallMat); w4.position.set(0, 0, -101); scene.add(w4);
-
-            stageData.obstacles.forEach(obs => {
-                const geo = new THREE.BoxGeometry(obs.w, obs.h, obs.d);
-                const mat = new THREE.MeshStandardMaterial({ color: stageData.color, roughness: 0.9 });
-                mat.color.multiplyScalar(0.8);
-                const mesh = new THREE.Mesh(geo, mat);
-                mesh.position.set(obs.x, obs.h/2, obs.z);
-                mesh.castShadow = true;
-                mesh.receiveShadow = true;
-                mesh.userData = { isObstacle: true, bounds: new THREE.Box3().setFromObject(mesh) };
-                scene.add(mesh);
-                terrain.children.push(mesh); 
-            });
-
-            const holeGeo = new THREE.CylinderGeometry(3, 3, 1, 32);
-            const holeMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
-            const holeMesh = new THREE.Mesh(holeGeo, holeMat);
-            holeMesh.position.set(stageData.holePos.x, 0.1, stageData.holePos.z);
-            scene.add(holeMesh);
-
-            const poleGeo = new THREE.CylinderGeometry(0.2, 0.2, 15, 8);
-            const poleMat = new THREE.MeshLambertMaterial({ color: 0xffffff });
-            const pole = new THREE.Mesh(poleGeo, poleMat);
-            pole.position.set(stageData.holePos.x, 7.5, stageData.holePos.z);
-            pole.castShadow = true;
-            scene.add(pole);
-
-            const flagGeo = new THREE.BoxGeometry(5, 3, 0.2);
-            const flagMat = new THREE.MeshLambertMaterial({ color: 0xff0000 });
-            const flag = new THREE.Mesh(flagGeo, flagMat);
-            flag.position.set(stageData.holePos.x + 2.5, 13, stageData.holePos.z);
-            flag.rotation.y = Math.PI / 2;
-            scene.add(flag);
-
-            goal = { pos: new THREE.Vector3(stageData.holePos.x, 0, stageData.holePos.z), radius: 3 };
-        }
-
-        function initStage(idx) {
-            currentStageIdx = idx;
-            const data = STAGES[idx];
-            
-            while(scene.children.length > 0){ scene.remove(scene.children[0]); }
-            scene.add(ambientLight);
-            scene.add(dirLight);
-            createStarField();
-
-            document.getElementById('planet-name').innerText = data.name;
-            document.getElementById('gravity-display').innerText = data.gravity;
-            document.getElementById('par-display').innerText = data.par;
-            shots = 0;
-            document.getElementById('shot-count').innerText = shots;
-            document.getElementById('message-area').classList.add('hidden');
-            document.getElementById('next-btn').style.display = 'none';
-
-            gravity = 9.8 * data.gravity;
-            createTerrain(data);
-
-            const ballGeo = new THREE.SphereGeometry(1, 16, 16);
-            const ballMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
-            ball = new THREE.Mesh(ballGeo, ballMat);
-            ball.position.set(data.startPos.x, 1, data.startPos.z);
-            ball.castShadow = true;
-            scene.add(ball);
-
-            aimArrow = new THREE.ArrowHelper(
-                new THREE.Vector3(0, 0, -1), 
-                ball.position, 
-                5, 
-                0xffff00
-            );
-            scene.add(aimArrow);
-
-            ballVelocity.set(0, 0, 0);
-            gameState = STATE.AIMING;
-            resetGaugeUI();
-            
-            const dirToHole = new THREE.Vector3().subVectors(goal.pos, ball.position).normalize();
-            aimAngle = Math.atan2(-dirToHole.x, -dirToHole.z);
-        }
-
-        function resetGaugeUI() {
-            document.getElementById('gauge-container-group').style.display = 'flex';
-            document.getElementById('gauge-status').innerText = "SPACE를 눌러 샷 시작";
-            document.getElementById('gauge-status').style.color = "#fbbf24";
-            
-            // Reset Horizontal
-            document.getElementById('gauge-power-fill').style.width = '0%';
-            document.getElementById('gauge-power-fill').style.opacity = '0.8';
-            gaugeCursorPos = 0;
-            document.getElementById('gauge-cursor').style.left = '0%';
-            
-            // Reset Vertical
-            document.getElementById('gauge-height-fill').style.height = '0%';
-            document.getElementById('gauge-height-fill').style.opacity = '0.8';
-            heightCursorPos = 0;
-            document.getElementById('gauge-height-cursor').style.bottom = '0%';
-
-            document.getElementById('shot-feedback').classList.add('hidden');
-        }
-
-        // --- 4. Controls & Input ---
-        const keys = { w: false, a: false, s: false, d: false, space: false };
-        let spacePressed = false; 
-
-        window.addEventListener('keydown', (e) => {
-            if (e.code === 'KeyA') keys.a = true;
-            if (e.code === 'KeyD') keys.d = true;
-            if (e.code === 'Space') {
-                if (!spacePressed) { 
-                    handleSpace();
-                    spacePressed = true;
-                }
-            }
-            if (e.code === 'KeyR') resetBall();
-        });
-
-        window.addEventListener('keyup', (e) => {
-            if (e.code === 'KeyA') keys.a = false;
-            if (e.code === 'KeyD') keys.d = false;
-            if (e.code === 'Space') spacePressed = false;
-        });
-
-        function handleSpace() {
-            // 4-Step Logic: Aim -> Power -> Height -> Curve -> Shoot
-            if (gameState === STATE.AIMING) {
-                // 1. Start Power
-                gameState = STATE.GAUGE_POWER;
-                gaugeDirection = 1;
-                gaugeCursorPos = 0;
-                document.getElementById('gauge-status').innerText = "파워 결정! (가로 왕복)";
-                document.getElementById('gauge-status').style.color = "#4ade80";
-            } 
-            else if (gameState === STATE.GAUGE_POWER) {
-                // 2. Lock Power -> Start Height
-                gameState = STATE.GAUGE_HEIGHT;
-                gaugePowerVal = gaugeCursorPos; 
-                
-                // Visual freeze power
-                document.getElementById('gauge-power-fill').style.width = gaugeCursorPos + '%';
-                document.getElementById('gauge-power-fill').style.opacity = '0.4';
-                
-                // Initialize Height Gauge
-                heightDirection = 1;
-                heightCursorPos = 0;
-
-                document.getElementById('gauge-status').innerText = "높이(탄도) 결정! (세로 왕복)";
-                document.getElementById('gauge-status').style.color = "#a855f7";
-            }
-            else if (gameState === STATE.GAUGE_HEIGHT) {
-                // 3. Lock Height -> Start Curve
-                gameState = STATE.GAUGE_CURVE;
-                gaugeHeightVal = heightCursorPos;
-                
-                // Visual freeze height
-                document.getElementById('gauge-height-fill').style.height = heightCursorPos + '%';
-                document.getElementById('gauge-height-fill').style.opacity = '0.4';
-
-                // Initialize Curve Gauge (Reuse horizontal cursor, reset or continue?)
-                // Let's reset cursor to center for curve? Or keep moving?
-                // Let's keep moving from where it was for smooth feel, or reset to 0 for clarity.
-                // Resetting to 0 makes it easier to predict.
-                gaugeCursorPos = 0; 
-                gaugeDirection = 1;
-
-                document.getElementById('gauge-status').innerText = "커브(방향) 결정!";
-                document.getElementById('gauge-status').style.color = "#fff";
-            }
-            else if (gameState === STATE.GAUGE_CURVE) {
-                // 4. Lock Curve & Shoot
-                gaugeCurveVal = (gaugeCursorPos - 50) / 50; // -1 to 1
-                
-                // Feedback
-                let feedbackText = "";
-                let feedbackColor = "";
-                
-                if (Math.abs(gaugeCurveVal) < 0.1) {
-                    feedbackText = "STRAIGHT!";
-                    feedbackColor = "text-white";
-                } else if (gaugeCurveVal < 0) {
-                    feedbackText = "HOOK!";
-                    feedbackColor = "text-red-500";
+            async init() {
+                // Auth
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
                 } else {
-                    feedbackText = "SLICE!";
-                    feedbackColor = "text-blue-500";
+                    await signInAnonymously(auth);
                 }
-                
-                showFeedback(feedbackText, feedbackColor);
-                shootBall();
-            }
-        }
+                onAuthStateChanged(auth, (user) => {
+                    if(user) { myUid = user.uid; console.log("Auth:", myUid); }
+                });
 
-        function showFeedback(text, colorClass) {
-            const el = document.getElementById('shot-feedback');
-            el.innerHTML = `<h2 class="text-6xl font-black italic drop-shadow-2xl ${colorClass}" style="-webkit-text-stroke: 2px white;">${text}</h2>`;
-            el.classList.remove('hidden');
-            setTimeout(() => { el.classList.add('hidden'); }, 1500);
-        }
+                ThreeScene.init();
+                this.updateUI();
+                this.setupTouchControls();
+                document.getElementById('loader').classList.add('hidden'); 
+            },
 
-        function shootBall() {
-            shots++;
-            document.getElementById('shot-count').innerText = shots;
-            document.getElementById('gauge-container-group').style.display = 'none';
-            
-            // --- Physics Calculation ---
-            
-            // 1. Total Speed (Power) - Increased Multiplier
-            const maxSpeed = 5.0; // Increased from 2.0 to 5.0
-            const totalSpeed = (gaugePowerVal / 100) * maxSpeed; 
-            
-            // 2. Launch Angle (Height)
-            // 0% = 10 degrees (Low runner), 100% = 60 degrees (High lob)
-            const minAngle = 10 * (Math.PI / 180);
-            const maxAngle = 60 * (Math.PI / 180);
-            const launchAngle = minAngle + (gaugeHeightVal / 100) * (maxAngle - minAngle);
-            
-            // Decompose Total Speed into Vertical(Y) and Horizontal(XZ) components
-            const velY = totalSpeed * Math.sin(launchAngle);
-            const velXZ = totalSpeed * Math.cos(launchAngle);
+            setupTouchControls() {
+                const btnLeft = document.getElementById('btn-left');
+                const btnRight = document.getElementById('btn-right');
+                const btnShot = document.getElementById('btn-shot');
+                const handlePress = (key, pressed) => { ThreeScene.setKey(key, pressed); };
+                const prevent = (e) => { if(e.cancelable) e.preventDefault(); };
 
-            // 3. Direction (Aim + Curve)
-            const maxCurveAngle = 0.5; // ~30 degrees
-            const shotAngle = aimAngle + (gaugeCurveVal * maxCurveAngle);
-            
-            const dirX = -Math.sin(shotAngle);
-            const dirZ = -Math.cos(shotAngle);
-            
-            // Final Velocity Vector
-            ballVelocity.set(dirX * velXZ, velY, dirZ * velXZ); 
-            
-            gameState = STATE.MOVING;
-        }
+                btnLeft.addEventListener('touchstart', (e) => { prevent(e); handlePress('a', true); }, {passive:false});
+                btnLeft.addEventListener('touchend', (e) => { prevent(e); handlePress('a', false); });
+                btnRight.addEventListener('touchstart', (e) => { prevent(e); handlePress('d', true); }, {passive:false});
+                btnRight.addEventListener('touchend', (e) => { prevent(e); handlePress('d', false); });
+                btnShot.addEventListener('touchstart', (e) => { prevent(e); ThreeScene.triggerSpace(); btnShot.style.transform = "scale(0.9)"; }, {passive:false});
+                btnShot.addEventListener('touchend', (e) => { prevent(e); btnShot.style.transform = "scale(1)"; });
+            },
 
-        function resetBall() {
-            if (gameState === STATE.HOLED) return;
-            ballVelocity.set(0, 0, 0);
-            ball.position.y = 1;
-            gameState = STATE.AIMING;
-            resetGaugeUI();
-        }
-
-        // --- 5. Game Loop ---
-
-        function update() {
-            // 1. Aiming
-            if (gameState === STATE.AIMING) {
-                const rotSpeed = 0.03;
-                if (keys.a) aimAngle += rotSpeed;
-                if (keys.d) aimAngle -= rotSpeed;
-
-                aimArrow.position.copy(ball.position);
-                const dir = new THREE.Vector3(-Math.sin(aimAngle), 0, -Math.cos(aimAngle));
-                aimArrow.setDirection(dir);
-            }
-
-            // 2. Horizontal Gauge Logic (Power OR Curve)
-            if (gameState === STATE.GAUGE_POWER || gameState === STATE.GAUGE_CURVE) {
-                gaugeCursorPos += gaugeSpeed * gaugeDirection;
-                if (gaugeCursorPos >= 100) { gaugeCursorPos = 100; gaugeDirection = -1; }
-                if (gaugeCursorPos <= 0) { gaugeCursorPos = 0; gaugeDirection = 1; }
-                
-                document.getElementById('gauge-cursor').style.left = gaugeCursorPos + '%';
-                
-                // Visual fill only for Power
-                if (gameState === STATE.GAUGE_POWER) {
-                    document.getElementById('gauge-power-fill').style.width = gaugeCursorPos + '%';
+            updateUI() {
+                ['lobby-screen','in-game-ui','result-screen','matching-screen'].forEach(id => {
+                    const el = document.getElementById(id); if(el) el.classList.add('hidden');
+                });
+                if (this.state === 'LOBBY') document.getElementById('lobby-screen').classList.remove('hidden');
+                else if (this.state === 'IN_GAME') {
+                    document.getElementById('in-game-ui').classList.remove('hidden');
+                    document.querySelector('.mobile-controls').style.display = 'flex';
                 }
-            }
+                else if (this.state === 'RESULT') document.getElementById('result-screen').classList.remove('hidden');
+            },
 
-            // 3. Vertical Gauge Logic (Height)
-            if (gameState === STATE.GAUGE_HEIGHT) {
-                heightCursorPos += gaugeSpeed * heightDirection;
-                if (heightCursorPos >= 100) { heightCursorPos = 100; heightDirection = -1; }
-                if (heightCursorPos <= 0) { heightCursorPos = 0; heightDirection = 1; }
+            selectMode(mode) {
+                this.mode = mode;
+                if (mode === 'CHALLENGE') {
+                    this.challengeQueue = PlanetDB.getFiveRandom();
+                    this.challengeCurrent = 0;
+                    this.startGame(this.challengeQueue[0]);
+                } else this.startGame(PlanetDB.getRandom());
+            },
+
+            // --- Multiplayer Logic ---
+            async startRealMulti() {
+                if(!myUid) return;
+                this.mode = 'MULTI';
+                document.getElementById('lobby-screen').classList.add('hidden');
+                document.getElementById('matching-screen').classList.remove('hidden');
+                document.getElementById('match-msg').innerText = "Finding room...";
+
+                const roomsRef = collection(db, 'artifacts', appId, 'public', 'data', 'rooms');
+                // Simple search for waiting room
+                // Note: In strict env, queries might need index. We fallback to client filter if needed but try simple query first.
+                // Or just fetch all (assuming low traffic for prototype)
+                const snap = await getDocs(roomsRef);
+                let joinRoom = null;
                 
-                document.getElementById('gauge-height-cursor').style.bottom = heightCursorPos + '%';
-                document.getElementById('gauge-height-fill').style.height = heightCursorPos + '%';
-            }
-
-            // 4. Physics
-            if (gameState === STATE.MOVING) {
-                ballVelocity.y -= gravity * 0.016;
-                ball.position.add(ballVelocity.clone().multiplyScalar(0.1));
-
-                // Floor
-                if (ball.position.y <= 1) {
-                    ball.position.y = 1;
-                    ballVelocity.y *= -restitution; 
-                    ballVelocity.x *= friction;
-                    ballVelocity.z *= friction;
-                    if (Math.abs(ballVelocity.y) < 0.2) ballVelocity.y = 0;
-                }
-
-                // Bounds
-                if (ball.position.x > 50 || ball.position.x < -50) { 
-                    ballVelocity.x *= -wallRestitution; 
-                    ball.position.x = Math.sign(ball.position.x)*49.5; 
-                }
-                if (ball.position.z > 100 || ball.position.z < -100) { 
-                    ballVelocity.z *= -wallRestitution; 
-                    ball.position.z = Math.sign(ball.position.z)*99.5; 
-                }
-                
-                // Obstacles
-                terrain.children.forEach(child => {
-                    if (child.userData.isObstacle) {
-                        const bounds = child.userData.bounds;
-                        const dx = Math.abs(ball.position.x - child.position.x);
-                        const dz = Math.abs(ball.position.z - child.position.z);
-                        const geometry = child.geometry;
-                        const hw = geometry.parameters.width / 2;
-                        const hd = geometry.parameters.depth / 2;
-                        
-                        if (dx < hw + 1 && dz < hd + 1 && ball.position.y < geometry.parameters.height) {
-                            if (dx / hw > dz / hd) { 
-                                ballVelocity.x *= -wallRestitution; 
-                                ball.position.x += Math.sign(ball.position.x - child.position.x) * 0.5; 
-                            } else { 
-                                ballVelocity.z *= -wallRestitution; 
-                                ball.position.z += Math.sign(ball.position.z - child.position.z) * 0.5; 
-                            }
-                        }
+                snap.forEach(d => {
+                    const data = d.data();
+                    if(data.status === 'waiting' && (!data.players || Object.keys(data.players).length < 4)) {
+                        joinRoom = { id: d.id, ...data };
                     }
                 });
 
-                if (ballVelocity.length() < 0.05 && ball.position.y === 1) {
-                    ballVelocity.set(0, 0, 0);
-                    checkHoleIn();
-                }
-            }
-
-            // Camera
-            const cx = ball.position.x - Math.sin(aimAngle) * -cameraDistance;
-            const cz = ball.position.z - Math.cos(aimAngle) * -cameraDistance;
-            camera.position.lerp(new THREE.Vector3(cx, ball.position.y + cameraHeight, cz), 0.1);
-            camera.lookAt(ball.position);
-        }
-
-        function checkHoleIn() {
-            const dist = ball.position.distanceTo(goal.pos);
-            if (dist < goal.radius) {
-                gameState = STATE.HOLED;
-                document.getElementById('message-title').innerText = "HOLE IN!";
-                document.getElementById('message-desc').innerText = `${shots} 샷 (PAR ${STAGES[currentStageIdx].par})`;
-                document.getElementById('message-area').classList.remove('hidden');
-                
-                if (currentStageIdx < STAGES.length - 1) {
-                    document.getElementById('next-btn').style.display = 'inline-block';
-                    document.getElementById('next-btn').onclick = () => initStage(currentStageIdx + 1);
+                if(joinRoom) {
+                    currentRoomId = joinRoom.id;
+                    const planetId = joinRoom.planetId;
+                    const roomDoc = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', currentRoomId);
+                    
+                    // Add player
+                    // Need to merge. We can't do deep merge easily without dot notation or reading first.
+                    // Let's assume we can use updateDoc with dot notation.
+                    await updateDoc(roomDoc, {
+                        [`players.${myUid}`]: { x:0, y:0, z:0, active:true }
+                    });
+                    
+                    this.connectToRoom(currentRoomId, planetId);
                 } else {
-                    document.getElementById('next-btn').innerText = "처음부터";
-                    document.getElementById('next-btn').onclick = () => initStage(0);
-                    document.getElementById('next-btn').style.display = 'inline-block';
+                    // Create
+                    const pid = Math.floor(Math.random()*300);
+                    const newRoom = {
+                        host: myUid,
+                        planetId: pid,
+                        status: 'waiting',
+                        players: {
+                            [myUid]: { x:0, y:0, z:0, active:true }
+                        },
+                        createdAt: Date.now()
+                    };
+                    const res = await addDoc(roomsRef, newRoom);
+                    currentRoomId = res.id;
+                    this.connectToRoom(currentRoomId, pid);
                 }
-            } else {
-                gameState = STATE.AIMING;
-                resetGaugeUI();
+            },
+
+            connectToRoom(rid, pid) {
+                const roomDoc = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', rid);
+                roomUnsubscribe = onSnapshot(roomDoc, (snap) => {
+                    if(snap.exists()) {
+                        const data = snap.data();
+                        const pList = data.players || {};
+                        const count = Object.keys(pList).length;
+                        document.getElementById('multi-status').style.display = 'block';
+                        document.getElementById('multi-status').innerText = `🟢 ONLINE: ${count} Players`;
+                        ThreeScene.updateRemotePlayers(pList, myUid);
+                    }
+                });
+                document.getElementById('matching-screen').classList.add('hidden');
+                this.startGame(PlanetDB.get(pid));
+            },
+
+            updateMyPos(pos) {
+                if(this.mode === 'MULTI' && currentRoomId && myUid) {
+                    const roomDoc = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', currentRoomId);
+                    updateDoc(roomDoc, {
+                        [`players.${myUid}.x`]: pos.x,
+                        [`players.${myUid}.y`]: pos.y,
+                        [`players.${myUid}.z`]: pos.z
+                    }).catch(()=>{});
+                }
+            },
+
+            startGame(stageData) {
+                this.state = 'IN_GAME';
+                this.currentStage = stageData;
+                const itemEl = document.getElementById('item-slots');
+                if(itemEl) itemEl.style.display = (this.mode === 'CASUAL') ? 'flex' : 'none';
+                this.updateUI();
+                this.startTime = Date.now();
+                if(this.timerInterval) clearInterval(this.timerInterval);
+                this.timerInterval = setInterval(()=>{
+                    const d = Date.now()-this.startTime;
+                    const m = Math.floor(d/60000).toString().padStart(2,'0');
+                    const s = Math.floor((d%60000)/1000).toString().padStart(2,'0');
+                    const tEl = document.getElementById('hud-timer');
+                    if(tEl) tEl.innerText = `${m}:${s}`;
+                }, 100);
+                ThreeScene.initStage(this.currentStage);
+            },
+
+            finishStage(shots) {
+                clearInterval(this.timerInterval);
+                this.state = 'RESULT';
+                this.updateUI();
+                document.getElementById('res-shots').innerText = shots;
+                document.getElementById('res-score').innerText = Math.max(0, 1000 + (this.currentStage.par - shots)*500);
+                const btnNext = document.getElementById('btn-next-level');
+                if (this.mode === 'CHALLENGE') {
+                    this.challengeCurrent++;
+                    if(this.challengeCurrent >= 5) btnNext.style.display = 'none';
+                    else btnNext.style.display = 'block';
+                } else btnNext.style.display = 'block';
+            },
+
+            nextLevel() {
+                if (this.mode === 'CHALLENGE') this.startGame(this.challengeQueue[this.challengeCurrent]);
+                else this.startGame(PlanetDB.getRandom());
+            },
+
+            returnToLobby() { 
+                this.state = 'LOBBY'; 
+                if(roomUnsubscribe) { roomUnsubscribe(); roomUnsubscribe=null; }
+                document.getElementById('multi-status').style.display='none';
+                this.updateUI(); 
+            },
+            useItem(type) { if(this.mode==='CASUAL' && this.items[type]>0) { ThreeScene.useItem(type); this.items[type]--; } }
+        };
+
+        // --- Three.js ---
+        const ThreeScene = (() => {
+            let scene, camera, renderer, ball, terrainMesh;
+            let gaugeState=0, gaugeVals={p:0,h:0,c:0}, gaugeAnim={pos:0,dir:1};
+            let physics={vel:new THREE.Vector3(), moving:false};
+            let stageData, aimAngle=0, orbitAngle=0, shots=0, itemActive=null;
+            let miniCtx, minimapBg;
+            let keys = {a:false, d:false};
+            let pathLut = [];
+            let gaugeLock = false;
+            let remoteMeshes = {}; // uid -> mesh
+
+            function init() {
+                const container = document.getElementById('canvas-container');
+                if(!container) return;
+                scene = new THREE.Scene(); 
+                scene.background = new THREE.Color(0x050505); 
+                scene.fog = new THREE.Fog(0x050505, 200, 3000);
+                camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 8000);
+                renderer = new THREE.WebGLRenderer({antialias:true});
+                renderer.setSize(window.innerWidth, window.innerHeight);
+                renderer.shadowMap.enabled = true;
+                renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+                container.appendChild(renderer.domElement);
+                const amb = new THREE.AmbientLight(0xffffff, 0.6); scene.add(amb);
+                const sun = new THREE.DirectionalLight(0xffffff, 1.2); 
+                sun.position.set(500,1000,500); sun.castShadow=true;
+                sun.shadow.mapSize.set(2048,2048);
+                sun.shadow.camera.far=5000; 
+                sun.shadow.camera.left=-2000; sun.shadow.camera.right=2000; 
+                sun.shadow.camera.top=2000; sun.shadow.camera.bottom=-2000;
+                scene.add(sun);
+                const sg = new THREE.BufferGeometry(); const sp = [];
+                for(let i=0; i<3000; i++) sp.push((Math.random()-0.5)*8000, (Math.random()-0.5)*4000+2000, (Math.random()-0.5)*8000);
+                sg.setAttribute('position', new THREE.Float32BufferAttribute(sp,3));
+                scene.add(new THREE.Points(sg, new THREE.PointsMaterial({color:0xffffff, size:2})));
+
+                const mc = document.getElementById('minimap-canvas'); 
+                if(mc) { miniCtx = mc.getContext('2d'); mc.width=300; mc.height=300; }
+
+                animate();
+                window.addEventListener('resize', ()=>{
+                    camera.aspect=window.innerWidth/window.innerHeight; camera.updateProjectionMatrix();
+                    renderer.setSize(window.innerWidth, window.innerHeight);
+                });
+                window.addEventListener('keydown', (e) => {
+                    if(e.code==='Space') triggerSpace();
+                    if(e.code==='KeyA') keys.a = true;
+                    if(e.code==='KeyD') keys.d = true;
+                    if(e.code==='KeyR') resetBall();
+                });
+                window.addEventListener('keyup', (e) => {
+                    if(e.code==='KeyA') keys.a = false;
+                    if(e.code==='KeyD') keys.d = false;
+                });
+                
+                let isDrag = false, lastX = 0;
+                const handleStart = (x) => { if(physics.moving) { isDrag=true; lastX=x; } };
+                const handleMove = (x) => { if(isDrag) { orbitAngle += (x-lastX)*0.01; lastX=x; } };
+                const handleEnd = () => { isDrag=false; };
+                window.addEventListener('mousedown', (e)=>handleStart(e.clientX));
+                window.addEventListener('mousemove', (e)=>handleMove(e.clientX));
+                window.addEventListener('mouseup', handleEnd);
+                window.addEventListener('touchstart', (e)=>{ if(!e.target.closest('.control-btn')) handleStart(e.touches[0].clientX); }, {passive:false});
+                window.addEventListener('touchmove', (e)=>handleMove(e.touches[0].clientX), {passive:false});
+                window.addEventListener('touchend', handleEnd);
             }
-        }
 
-        function animate() {
-            requestAnimationFrame(animate);
-            update();
-            renderer.render(scene, camera);
-        }
+            function updateRemotePlayers(players, myUid) {
+                // Remove disconnected
+                for(let uid in remoteMeshes) {
+                    if(!players[uid]) { scene.remove(remoteMeshes[uid]); delete remoteMeshes[uid]; }
+                }
+                // Update/Add
+                for(let uid in players) {
+                    if(uid === myUid) continue;
+                    const p = players[uid];
+                    if(!remoteMeshes[uid]) {
+                        const m = new THREE.Mesh(new THREE.SphereGeometry(2,16,16), new THREE.MeshBasicMaterial({color:0x00ffff, wireframe:true}));
+                        scene.add(m);
+                        remoteMeshes[uid] = m;
+                    }
+                    remoteMeshes[uid].position.set(p.x, p.y, p.z);
+                }
+            }
 
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        });
-        
-        initStage(0);
-        animate();
+            function initStage(data) {
+                if(!scene) init();
+                stageData = data; shots=0; physics.vel.set(0,0,0); physics.moving=false; gaugeState=0;
+                
+                // Clear remotes
+                for(let uid in remoteMeshes) { scene.remove(remoteMeshes[uid]); }
+                remoteMeshes = {};
 
+                const nameEl = document.getElementById('hud-planet-name'); if(nameEl) nameEl.innerText = data.name;
+                const infoEl = document.getElementById('hud-planet-info'); if(infoEl) infoEl.innerText = `${data.gravity.toFixed(2)}g | Par ${data.par}`;
+                document.getElementById('hud-shots').innerText = 0;
+                
+                document.getElementById('gauge-container-group').style.display = 'flex';
+                document.getElementById('gauge-container-group').classList.remove('hidden');
+                document.getElementById('minimap-container').style.display = 'block';
+                document.getElementById('minimap-container').classList.remove('hidden');
+
+                if(terrainMesh) { scene.remove(terrainMesh); terrainMesh.geometry.dispose(); }
+                if(ball) scene.remove(ball);
+
+                const mapSize=4000, seg=150;
+                const geo=new THREE.PlaneGeometry(mapSize,mapSize,seg,seg); geo.rotateX(-Math.PI/2);
+                const pos=geo.attributes.position; const colors=[];
+                const curve=new THREE.CatmullRomCurve3(data.pathPoints);
+                pathLut=curve.getSpacedPoints(150); 
+
+                for(let i=0; i<pos.count; i++){
+                    const x=pos.getX(i), z=pos.getZ(i);
+                    let minDist=Infinity;
+                    for(let k=0; k<pathLut.length; k+=3) { 
+                        const d = (x-pathLut[k].x)**2 + (z-pathLut[k].z)**2;
+                        if(d<minDist) minDist=d;
+                    }
+                    minDist = Math.sqrt(minDist);
+                    let y=0, c=new THREE.Color();
+                    const distH = Math.sqrt((x-data.holePos.x)**2+(z-data.holePos.z)**2);
+                    if(distH<30) { y=0; c.setHex(0x22c55e); }
+                    else if(minDist < data.width) { y=Math.sin(x*0.02)*2; c.setHex(data.color); }
+                    else if(minDist < data.width*2) { y=10; c.setHex(0x57534e); }
+                    else { y=30+(minDist-data.width*2)*0.5; c.setHex(0x292524); }
+                    pos.setY(i,y); colors.push(c.r,c.g,c.b);
+                }
+                geo.setAttribute('color', new THREE.Float32BufferAttribute(colors,3)); geo.computeVertexNormals();
+                terrainMesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({vertexColors:true, roughness:0.9}));
+                terrainMesh.receiveShadow=true; scene.add(terrainMesh);
+
+                ball = new THREE.Mesh(new THREE.SphereGeometry(2,16,16), new THREE.MeshStandardMaterial({color:0xffffff}));
+                ball.castShadow=true; scene.add(ball);
+                resetBall();
+
+                const pole=new THREE.Mesh(new THREE.CylinderGeometry(0.5,0.5,30), new THREE.MeshLambertMaterial({color:0xffffff}));
+                pole.position.set(data.holePos.x, getTerrainHeight(data.holePos.x, data.holePos.z)+15, data.holePos.z);
+                const flag=new THREE.Mesh(new THREE.BoxGeometry(10,6,0.5), new THREE.MeshLambertMaterial({color:0xff0000}));
+                flag.position.set(5,12,0); pole.add(flag); scene.add(pole);
+
+                const dir = new THREE.Vector3().subVectors(data.holePos, data.startPos).normalize();
+                aimAngle = Math.atan2(-dir.x, -dir.z); orbitAngle=aimAngle;
+                
+                setTimeout(drawMinimap, 200);
+            }
+
+            const ray = new THREE.Raycaster(); const down = new THREE.Vector3(0,-1,0);
+            function getTerrainHeight(x,z) {
+                if(!terrainMesh) return 0;
+                ray.set(new THREE.Vector3(x, 1000, z), down);
+                const hits = ray.intersectObject(terrainMesh); return hits.length>0?hits[0].point.y:0;
+            }
+            function getTerrainNormal(x,z) {
+                if(!terrainMesh) return new THREE.Vector3(0,1,0);
+                ray.set(new THREE.Vector3(x, 1000, z), down);
+                const hits = ray.intersectObject(terrainMesh); return hits.length>0?hits[0].face.normal:new THREE.Vector3(0,1,0);
+            }
+
+            function animate() {
+                requestAnimationFrame(animate);
+                if(!stageData) return;
+
+                if(!physics.moving) {
+                    if(keys.a) aimAngle += 0.04;
+                    if(keys.d) aimAngle -= 0.04;
+                }
+
+                if(gaugeState > 0) {
+                    gaugeAnim.pos += 2.5 * gaugeAnim.dir;
+                    if(gaugeAnim.pos>=100||gaugeAnim.pos<=0) gaugeAnim.dir*=-1;
+                    if(gaugeState!==2) {
+                        const cur = document.getElementById('gauge-cursor'); if(cur) cur.style.left=gaugeAnim.pos+'%';
+                        const fill = document.getElementById('gauge-power-fill'); if(gaugeState===1 && fill) fill.style.width=gaugeAnim.pos+'%';
+                    } else {
+                        const hCur = document.getElementById('gauge-height-cursor'); if(hCur) hCur.style.bottom=gaugeAnim.pos+'%';
+                        const hFill = document.getElementById('gauge-height-fill'); if(hFill) hFill.style.height=gaugeAnim.pos+'%';
+                    }
+                }
+
+                if(physics.moving) {
+                    const dt=0.016; const steps=4; const stepDt = dt / steps;
+                    let syncCounter = 0;
+                    for(let s=0; s<steps; s++) {
+                        physics.vel.y -= (9.8*stageData.gravity)*stepDt;
+                        let nextPos = ball.position.clone().add(physics.vel.clone().multiplyScalar(stepDt * 20.0));
+                        
+                        let closestPt = pathLut[0];
+                        let minDistSq = Infinity;
+                        for(let k=0; k<pathLut.length; k+=5) {
+                            const d = (nextPos.x-pathLut[k].x)**2 + (nextPos.z-pathLut[k].z)**2;
+                            if(d < minDistSq) { minDistSq = d; closestPt = pathLut[k]; }
+                        }
+                        if(Math.sqrt(minDistSq) > stageData.width * 2.5) {
+                            physics.vel.x *= -0.5; physics.vel.z *= -0.5;
+                            const pushDir = new THREE.Vector3().subVectors(closestPt, nextPos).normalize();
+                            nextPos.add(pushDir.multiplyScalar(10)); 
+                        }
+
+                        const gy = getTerrainHeight(nextPos.x, nextPos.z);
+                        if(nextPos.y <= gy+2) {
+                            nextPos.y = gy+2;
+                            const norm = getTerrainNormal(nextPos.x, nextPos.z);
+                            if(physics.vel.y<0) {
+                                const d = physics.vel.dot(norm);
+                                physics.vel.add(norm.clone().multiplyScalar(-2*d).multiplyScalar(0.6));
+                            }
+                            physics.vel.x*=0.995; physics.vel.z*=0.995; 
+                            if(physics.vel.length()<2 && Math.abs(ball.position.y-(gy+2))<1) {
+                                physics.vel.set(0,0,0); physics.moving=false; checkWin(); break;
+                            }
+                        }
+                        ball.position.copy(nextPos);
+                        if(ball.position.y<-100) { resetBall(); break; }
+                    }
+                    // Network Sync Throttled
+                    syncCounter++;
+                    if(syncCounter > 5) {
+                        GameApp.updateMyPos(ball.position);
+                        syncCounter = 0;
+                    }
+                }
+
+                let ct, dist=60;
+                if(physics.moving) ct=new THREE.Vector3(ball.position.x-Math.sin(orbitAngle)*-dist, ball.position.y+30, ball.position.z-Math.cos(orbitAngle)*-dist);
+                else ct=new THREE.Vector3(ball.position.x-Math.sin(aimAngle)*-dist, ball.position.y+30, ball.position.z-Math.cos(aimAngle)*-dist);
+                camera.position.lerp(ct, 0.1); camera.lookAt(ball.position);
+
+                updateMinimap();
+                renderer.render(scene, camera);
+            }
+
+            function triggerSpace() {
+                if(physics.moving || gaugeLock) return;
+                gaugeLock = true;
+                setTimeout(() => { gaugeLock = false; }, 200);
+
+                const stat = document.getElementById('gauge-status');
+                if(gaugeState === 0) { 
+                    gaugeState = 1; gaugeAnim.pos = 0; gaugeAnim.dir = 1; stat.innerText = "TAP: POWER"; 
+                } else if(gaugeState === 1) { 
+                    gaugeVals.p = gaugeAnim.pos; gaugeState = 2; gaugeAnim.pos = 0; gaugeAnim.dir = 1; stat.innerText = "TAP: HEIGHT"; 
+                } else if(gaugeState === 2) { 
+                    gaugeVals.h = gaugeAnim.pos; gaugeState = 3; gaugeAnim.pos = 50; gaugeAnim.dir = 1; stat.innerText = "TAP: CURVE"; 
+                } else if(gaugeState === 3) { 
+                    gaugeVals.c = (gaugeAnim.pos - 50) / 50; shoot(); 
+                }
+            }
+
+            function shoot() {
+                gaugeState=0; shots++;
+                document.getElementById('hud-shots').innerText=shots;
+                document.getElementById('gauge-container-group').style.display='none';
+                
+                let p = gaugeVals.p/100 * 85; 
+                if(itemActive==='POWER') p*=1.5;
+                const ang = (15 + (gaugeVals.h/100)*60) * (Math.PI/180);
+                const cur = gaugeVals.c*0.5;
+                const fa = aimAngle+cur;
+                const vxz = p*Math.cos(ang); const vy=p*Math.sin(ang);
+                physics.vel.set(-Math.sin(fa)*vxz, vy, -Math.cos(fa)*vxz);
+                physics.moving=true; orbitAngle=aimAngle; itemActive=null;
+            }
+
+            function resetBall() {
+                if(!stageData) return;
+                physics.vel.set(0,0,0); physics.moving=false;
+                const y=getTerrainHeight(stageData.startPos.x, stageData.startPos.z);
+                ball.position.set(stageData.startPos.x, y+2, stageData.startPos.z);
+                document.getElementById('gauge-container-group').style.display='flex';
+                document.getElementById('gauge-status').innerText="TAP SHOT";
+                document.getElementById('gauge-power-fill').style.width='0%';
+                document.getElementById('gauge-height-fill').style.height='0%';
+                gaugeState = 0; 
+                GameApp.updateMyPos(ball.position);
+            }
+
+            function checkWin() {
+                const d = ball.position.distanceTo(new THREE.Vector3(stageData.holePos.x, ball.position.y, stageData.holePos.z));
+                if(d<15) GameApp.finishStage(shots);
+                else {
+                    document.getElementById('gauge-container-group').style.display='flex';
+                    document.getElementById('gauge-status').innerText="TAP SHOT";
+                    gaugeState = 0; 
+                }
+                GameApp.updateMyPos(ball.position);
+            }
+
+            function drawMinimap() {
+                if(!miniCtx || !stageData) return;
+                const size = 300;
+                miniCtx.fillStyle='#000'; miniCtx.fillRect(0,0,size,size);
+                
+                miniCtx.lineWidth = 15;
+                miniCtx.lineCap = 'round';
+                miniCtx.lineJoin = 'round';
+                miniCtx.strokeStyle = '#22c55e'; 
+                miniCtx.beginPath();
+                
+                const mapScale = size / 4000;
+                const offset = 2000;
+                
+                pathLut.forEach((pt, i) => {
+                    const mx = (pt.x + offset) * mapScale;
+                    const my = (pt.z + offset) * mapScale;
+                    if(i===0) miniCtx.moveTo(mx, my);
+                    else miniCtx.lineTo(mx, my);
+                });
+                miniCtx.stroke();
+
+                const sx=(stageData.startPos.x+offset)*mapScale; const sz=(stageData.startPos.z+offset)*mapScale;
+                const hx=(stageData.holePos.x+offset)*mapScale; const hz=(stageData.holePos.z+offset)*mapScale;
+                miniCtx.fillStyle='#fff'; miniCtx.beginPath(); miniCtx.arc(sx,sz,4,0,Math.PI*2); miniCtx.fill();
+                miniCtx.fillStyle='#ef4444'; miniCtx.beginPath(); miniCtx.arc(hx,hz,6,0,Math.PI*2); miniCtx.fill();
+                minimapBg=miniCtx.getImageData(0,0,size,size);
+            }
+            function updateMinimap() {
+                if(!minimapBg || !miniCtx) return;
+                miniCtx.putImageData(minimapBg,0,0);
+                const mapScale = 300 / 4000;
+                const offset = 2000;
+                const bx = (ball.position.x + offset) * mapScale;
+                const bz = (ball.position.z + offset) * mapScale;
+                miniCtx.fillStyle='#fff'; miniCtx.beginPath(); miniCtx.arc(bx,bz,3,0,Math.PI*2); miniCtx.fill();
+                miniCtx.strokeStyle='#000'; miniCtx.lineWidth=1; miniCtx.stroke();
+                
+                // Draw Remote Players
+                for(let uid in remoteMeshes) {
+                    const rp = remoteMeshes[uid].position;
+                    const rx = (rp.x + offset) * mapScale;
+                    const rz = (rp.z + offset) * mapScale;
+                    miniCtx.fillStyle='#0ff'; miniCtx.beginPath(); miniCtx.arc(rx,rz,2,0,Math.PI*2); miniCtx.fill();
+                }
+            }
+
+            function stopBall() { if(physics.moving) { physics.vel.set(0,0,0); physics.moving=false; checkWin(); }}
+            function useItem(t) { if(t==='BRAKE') stopBall(); if(t==='POWER') itemActive='POWER'; }
+            function setKey(k,v) { keys[k]=v; }
+
+            return { init, initStage, resetBall, setKey, triggerSpace, useItem, updateRemotePlayers };
+        })();
+
+        window.onload = () => GameApp.init();
     </script>
 </body>
 </html>
