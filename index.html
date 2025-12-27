@@ -3,9 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>리얼 우주 중력 골프 v0.1.1 (Online)</title>
+    <title>리얼 우주 중력 골프 v0.1.4 (P2P Multi)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- PeerJS for P2P -->
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Noto+Sans+KR:wght@300;500;700&display=swap" rel="stylesheet">
     <style>
         body { margin: 0; overflow: hidden; background-color: #050505; font-family: 'Noto Sans KR', sans-serif; touch-action: none; user-select: none; -webkit-user-select: none; }
@@ -15,149 +17,134 @@
         @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
         
         .btn-menu {
-            background: linear-gradient(135deg, rgba(30, 58, 138, 0.4) 0%, rgba(88, 28, 135, 0.4) 100%);
-            border: 1px solid rgba(255,255,255,0.1);
-            backdrop-filter: blur(10px);
+            background: linear-gradient(135deg, rgba(30, 58, 138, 0.6) 0%, rgba(88, 28, 135, 0.6) 100%);
+            border: 1px solid rgba(255,255,255,0.2);
+            backdrop-filter: blur(12px);
             transition: all 0.2s;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
         }
-        .btn-menu:active { transform: scale(0.95); background: rgba(59, 130, 246, 0.6); }
+        .btn-menu:active { transform: scale(0.96); background: rgba(59, 130, 246, 0.8); }
 
-        /* 게이지 & 미니맵 */
-        #gauge-container-group { position: absolute; bottom: 120px; left: 50%; transform: translateX(-50%); display: none; gap: 15px; z-index: 50; align-items: flex-end; width: 90%; max-width: 500px; justify-content: center; background: rgba(0,0,0,0.6); padding: 15px; border-radius: 20px; border: 1px solid #555; }
-        #gauge-height-wrapper { width: 30px; height: 140px; background: #111; border: 2px solid #888; border-radius: 8px; position: relative; overflow: hidden; flex-shrink: 0; }
-        #gauge-height-fill { width: 100%; height: 0%; bottom: 0; position: absolute; background: linear-gradient(0deg, #2563eb, #9333ea); transition: height 0.05s linear; }
-        #gauge-height-cursor { position: absolute; bottom: 0%; left: 0; width: 100%; height: 4px; background: #fff; z-index: 10; box-shadow: 0 0 5px #fff; }
-        #gauge-bar { width: 100%; height: 30px; background: #111; border: 2px solid #888; border-radius: 15px; position: relative; overflow: hidden; }
-        #gauge-power-fill { height: 100%; width: 0%; position: absolute; top: 0; left: 0; background: linear-gradient(90deg, #4ade80, #facc15, #ef4444); }
-        #gauge-center-line { position: absolute; top: 0; left: 50%; width: 2px; height: 100%; background: rgba(255,255,255,0.8); z-index: 5; }
-        .cursor-indicator { position: absolute; background: #fff; box-shadow: 0 0 8px #fff; z-index: 10; border: 1px solid #000; width: 4px; height: 30px; top:-2px; }
-
-        #minimap-container { position: absolute; top: 80px; right: 20px; width: 140px; height: 140px; background: rgba(0, 0, 0, 0.9); border: 2px solid #666; border-radius: 50%; overflow: hidden; z-index: 50; display: none; }
+        /* UI 요소들 (게이지, 미니맵 등) */
+        #gauge-container-group { position: absolute; bottom: 120px; left: 50%; transform: translateX(-50%); display: none; gap: 15px; z-index: 50; align-items: flex-end; width: 90%; max-width: 500px; justify-content: center; background: rgba(0,0,0,0.7); padding: 15px; border-radius: 20px; border: 1px solid #555; }
+        #gauge-height-wrapper { width: 36px; height: 140px; background: #111; border: 2px solid #888; border-radius: 8px; position: relative; overflow: hidden; flex-shrink: 0; }
+        #gauge-height-fill { width: 100%; height: 0%; bottom: 0; position: absolute; background: linear-gradient(to top, #2563eb, #a855f7); transition: height 0.05s linear; }
+        #gauge-height-cursor { position: absolute; bottom: 0%; left: 0; width: 100%; height: 4px; background: #fff; z-index: 20; }
+        #gauge-bar { width: 100%; height: 36px; background: #111; border: 2px solid #888; border-radius: 18px; position: relative; overflow: hidden; }
+        #gauge-power-fill { height: 100%; width: 0%; position: absolute; top: 0; left: 0; background: linear-gradient(to right, #4ade80, #facc15, #ef4444); }
+        #gauge-center-line { position: absolute; top: 0; left: 50%; width: 2px; height: 100%; background: rgba(255,255,255,0.8); z-index: 6; }
+        .cursor-indicator { position: absolute; top: 0; height: 100%; width: 6px; background: #fff; z-index: 30; transform: translateX(-50%); }
+        #minimap-container { position: absolute; top: 80px; right: 20px; width: 150px; height: 150px; background: #000; border: 3px solid #444; border-radius: 50%; overflow: hidden; z-index: 50; display: none; }
         #minimap-canvas { width: 100%; height: 100%; display: block; }
+        .mobile-controls { display: none; position: absolute; bottom: 30px; z-index: 110; width: 100%; justify-content: space-between; padding: 0 30px; pointer-events: none; }
+        .control-btn { pointer-events: auto; width: 80px; height: 80px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.3); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 28px; color: white; backdrop-filter: blur(8px); transition: 0.1s; }
+        .control-btn:active { background: rgba(255,255,255,0.3); transform: scale(0.95); }
+        .control-btn.shot-btn { width: 100px; height: 100px; background: linear-gradient(135deg, rgba(234, 179, 8, 0.3), rgba(234, 179, 8, 0.5)); border-color: #facc15; font-weight: 900; font-size: 20px; color: #fef08a; }
         
-        .mobile-controls { display: none; position: absolute; bottom: 30px; z-index: 60; width: 100%; justify-content: space-between; padding: 0 30px; pointer-events: none; }
-        .control-btn { pointer-events: auto; width: 70px; height: 70px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.3); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; color: white; backdrop-filter: blur(4px); transition: 0.1s; user-select: none; }
-        .control-btn:active { background: rgba(255,255,255,0.3); transform: scale(0.9); }
-        .control-btn.shot-btn { width: 90px; height: 90px; background: rgba(234, 179, 8, 0.2); border-color: rgba(234, 179, 8, 0.5); font-weight: bold; font-size: 18px; }
-        .control-btn.shot-btn:active { background: rgba(234, 179, 8, 0.5); }
-        
-        #item-slots { position: absolute; top: 240px; right: 20px; display: none; flex-direction: column; gap: 8px; z-index: 40; }
-        .item-box { width: 50px; height: 50px; background: rgba(0,0,0,0.6); border: 1px solid #444; border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; cursor: pointer; font-size: 10px; pointer-events: auto; }
-        
-        #loader { position: fixed; inset: 0; background: #000; z-index: 100; display: flex; justify-content: center; align-items: center; color: white; flex-direction: column; }
-        .spinner { width: 40px; height: 40px; border: 4px solid #333; border-top: 4px solid #fff; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 10px; }
+        #loader { position: fixed; inset: 0; background: #020617; z-index: 200; display: flex; justify-content: center; align-items: center; color: white; flex-direction: column; }
+        .spinner { width: 50px; height: 50px; border: 5px solid #1e293b; border-top: 5px solid #3b82f6; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 20px; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        /* 멀티플레이 상태바 */
+        /* P2P UI */
+        #p2p-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 150; display: none; justify-content: center; align-items: center; flex-direction: column; }
+        #room-code-display { font-size: 40px; font-weight: 900; color: #4ade80; letter-spacing: 5px; margin: 20px 0; font-family: 'Orbitron'; cursor: pointer; }
+        #copy-msg { font-size: 12px; color: #888; margin-bottom: 20px; }
+        .p2p-box { background: #1e293b; padding: 30px; border-radius: 20px; border: 1px solid #475569; text-align: center; width: 90%; max-width: 400px; }
         #multi-status { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); font-size: 12px; color: #4ade80; z-index: 60; display: none; background: rgba(0,0,0,0.7); padding: 5px 15px; border-radius: 20px; border: 1px solid #4ade80; }
     </style>
 </head>
 <body class="text-white">
 
-    <div id="multi-status">🟢 ONLINE: 1 Players</div>
-
     <div id="loader">
         <div class="spinner"></div>
-        <p>CONNECTING SATELLITE...</p>
+        <p class="font-sci tracking-widest text-blue-400">INITIALIZING P2P MODULE...</p>
     </div>
+
+    <div id="multi-status">🟢 CONNECTED: 2 Players</div>
 
     <!-- 로비 -->
     <div id="lobby-screen" class="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/90 backdrop-blur-md fade-in hidden">
-        <div class="text-center mb-6 mt-10">
-            <h1 class="text-4xl md:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 font-sci mb-2">
-                GRAVITY GOLF
+        <div class="text-center mb-8 mt-10 relative">
+            <h1 class="text-5xl md:text-7xl font-black text-transparent bg-clip-text bg-gradient-to-br from-white to-slate-400 font-sci mb-2">
+                GRAVITY<span class="text-blue-500">GOLF</span>
             </h1>
-            <p class="text-slate-400 text-sm md:text-lg font-sci tracking-widest">ONLINE MULTIPLAYER v0.1.1</p>
+            <p class="text-slate-400 text-sm font-sci tracking-[0.5em]">P2P MULTIPLAYER v0.1.4</p>
         </div>
         
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-4xl px-6 pb-10 overflow-y-auto" style="max-height: 70vh;">
-            <button onclick="GameApp.selectMode('SPEED')" class="btn-menu p-6 rounded-2xl flex items-center gap-4 group">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-4xl px-6 pb-10 overflow-y-auto" style="max-height: 65vh;">
+            <button onclick="GameApp.selectMode('SPEED')" class="btn-menu p-6 rounded-2xl flex items-center gap-5 group">
                 <div class="text-4xl">⚡</div>
-                <div class="text-left">
-                    <h3 class="text-xl font-bold font-sci text-yellow-400">SPEED GOLF</h3>
-                    <p class="text-xs text-slate-300">Single Player</p>
-                </div>
+                <div class="text-left"><h3 class="text-xl font-bold font-sci text-yellow-400">SPEED RUSH</h3><p class="text-xs text-slate-300">Single Player</p></div>
             </button>
-            <button onclick="GameApp.selectMode('CASUAL')" class="btn-menu p-6 rounded-2xl flex items-center gap-4 group">
+            <button onclick="GameApp.selectMode('CASUAL')" class="btn-menu p-6 rounded-2xl flex items-center gap-5 group">
                 <div class="text-4xl">🎒</div>
-                <div class="text-left">
-                    <h3 class="text-xl font-bold font-sci text-green-400">CASUAL GOLF</h3>
-                    <p class="text-xs text-slate-300">With Items</p>
-                </div>
+                <div class="text-left"><h3 class="text-xl font-bold font-sci text-green-400">CASUAL</h3><p class="text-xs text-slate-300">Free Roam</p></div>
             </button>
-            <button onclick="GameApp.selectMode('CHALLENGE')" class="btn-menu p-6 rounded-2xl flex items-center gap-4 group">
-                <div class="text-4xl">🏆</div>
-                <div class="text-left">
-                    <h3 class="text-xl font-bold font-sci text-red-400">CHALLENGE</h3>
-                    <p class="text-xs text-slate-300">5-Hole Run</p>
-                </div>
+            <button onclick="GameApp.openP2P('HOST')" class="btn-menu p-6 rounded-2xl flex items-center gap-5 group bg-blue-900/20 border-blue-500/50">
+                <div class="text-4xl">🏠</div>
+                <div class="text-left"><h3 class="text-xl font-bold font-sci text-blue-400">CREATE ROOM</h3><p class="text-xs text-slate-300">Host Game</p></div>
             </button>
-            <button onclick="GameApp.startRealMulti()" class="btn-menu p-6 rounded-2xl flex items-center gap-4 group relative overflow-hidden">
-                <div class="absolute inset-0 bg-blue-500/10 animate-pulse"></div>
-                <div class="text-4xl">🌍</div>
-                <div class="text-left">
-                    <h3 class="text-xl font-bold font-sci text-blue-400">MULTIPLAYER</h3>
-                    <p class="text-xs text-slate-300">Real-Time Online</p>
-                </div>
+            <button onclick="GameApp.openP2P('JOIN')" class="btn-menu p-6 rounded-2xl flex items-center gap-5 group bg-purple-900/20 border-purple-500/50">
+                <div class="text-4xl">🚀</div>
+                <div class="text-left"><h3 class="text-xl font-bold font-sci text-purple-400">JOIN ROOM</h3><p class="text-xs text-slate-300">Enter Code</p></div>
             </button>
         </div>
     </div>
 
-    <!-- 매칭 -->
-    <div id="matching-screen" class="hidden absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/95">
-        <div class="text-6xl mb-4 animate-bounce">📡</div>
-        <h2 class="text-xl font-bold font-sci text-blue-400 animate-pulse">SEARCHING ROOM...</h2>
-        <p id="match-msg" class="text-slate-500 text-sm mt-2">Connecting to server...</p>
+    <!-- P2P 모달 -->
+    <div id="p2p-modal">
+        <!-- 호스트 화면 -->
+        <div id="p2p-host" class="p2p-box hidden">
+            <h2 class="text-2xl font-bold font-sci mb-2">WAITING FOR PLAYER</h2>
+            <p class="text-slate-400 text-sm">Share this code with your friend:</p>
+            <div id="room-code-display" onclick="GameApp.copyCode()">-----</div>
+            <p id="copy-msg">Click code to copy</p>
+            <div class="animate-pulse text-yellow-400 text-sm mt-4">Waiting for connection...</div>
+            <button onclick="GameApp.closeP2P()" class="mt-6 px-6 py-2 bg-slate-700 rounded-lg hover:bg-slate-600">CANCEL</button>
+        </div>
+
+        <!-- 조인 화면 -->
+        <div id="p2p-join" class="p2p-box hidden">
+            <h2 class="text-2xl font-bold font-sci mb-4">JOIN GAME</h2>
+            <input type="text" id="room-code-input" placeholder="ENTER ROOM CODE" class="w-full bg-black/50 border border-slate-500 p-4 text-center text-2xl font-sci text-white rounded-lg mb-4 focus:border-blue-500 outline-none uppercase" maxlength="5">
+            <button onclick="GameApp.connectToPeer()" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-lg mb-2">CONNECT 🚀</button>
+            <button onclick="GameApp.closeP2P()" class="w-full bg-slate-700 hover:bg-slate-600 text-white font-bold py-3 rounded-lg">CANCEL</button>
+        </div>
     </div>
 
-    <!-- 인게임 HUD -->
+    <!-- 인게임 UI -->
     <div id="in-game-ui" class="absolute inset-0 pointer-events-none hidden z-10">
-        <div class="absolute top-4 left-4 pointer-events-auto flex items-center gap-2 bg-black/60 p-2 rounded-lg backdrop-blur-sm z-50">
-            <span class="text-2xl">🪐</span>
+        <div class="absolute top-6 left-6 pointer-events-auto flex items-center gap-4 bg-black/60 p-3 rounded-2xl border border-white/10 backdrop-blur-md z-50 shadow-lg">
+            <div class="w-10 h-10 rounded-full bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center text-xl shadow-inner">🪐</div>
             <div>
-                <h2 id="hud-planet-name" class="text-sm font-bold font-sci text-yellow-400 leading-none">PLANET</h2>
-                <p id="hud-planet-info" class="text-[10px] text-slate-300 font-mono">1.0g | Par 4</p>
+                <h2 id="hud-planet-name" class="text-base font-bold font-sci text-white leading-none mb-1">PLANET</h2>
+                <p id="hud-planet-info" class="text-[10px] text-slate-300 font-mono tracking-wide">G: 1.00</p>
             </div>
         </div>
-
-        <button onclick="ThreeScene.resetBall()" class="absolute top-4 left-1/2 transform -translate-x-1/2 pointer-events-auto bg-red-500/80 p-2 rounded-full text-xs font-bold border border-red-400 shadow-lg active:scale-95 transition z-50">
-            ↺ RESET
-        </button>
-
-        <div class="absolute top-4 right-4 text-right bg-black/60 p-2 rounded-lg backdrop-blur-sm z-50">
-            <div class="text-2xl font-bold font-sci text-white leading-none"><span id="hud-shots">0</span></div>
-            <div class="text-[10px] text-slate-400">SHOTS</div>
-            <div id="hud-timer" class="text-sm text-yellow-400 font-mono mt-1">00:00</div>
+        <button onclick="ThreeScene.resetBall()" class="absolute top-6 left-1/2 transform -translate-x-1/2 pointer-events-auto bg-white/10 hover:bg-white/20 p-2 px-5 rounded-full text-[10px] font-bold border border-white/20 backdrop-blur-md transition z-50">↺ RESPAWN</button>
+        <div class="absolute top-6 right-6 text-right bg-black/60 p-3 rounded-2xl border border-white/10 backdrop-blur-md z-50">
+            <div class="text-3xl font-black font-sci text-white leading-none"><span id="hud-shots">0</span></div>
+            <div class="text-[10px] text-slate-400 font-bold tracking-widest">STROKES</div>
         </div>
 
+        <!-- 게이지 -->
         <div id="gauge-container-group" class="pointer-events-auto">
             <div id="gauge-height-wrapper">
-                <div class="absolute top-[-20px] w-full text-center text-[9px] font-bold text-purple-400">ANG</div>
+                <div class="absolute top-2 w-full text-center text-[8px] font-bold text-white/50 z-20">ANG</div>
                 <div id="gauge-height-fill"></div>
                 <div id="gauge-height-cursor"></div>
             </div>
             <div style="position: relative; flex-grow: 1;">
-                <div id="gauge-status" class="absolute top-[-25px] w-full text-center font-bold text-yellow-400 text-xs bg-black/70 rounded px-2 border border-yellow-500/30">TAP SHOT</div>
+                <div id="gauge-status" class="absolute top-[-35px] left-0 font-bold text-yellow-400 text-xs font-sci tracking-wider bg-black/80 px-3 py-1 rounded-full border border-yellow-500/30">READY</div>
                 <div id="gauge-bar">
                     <div id="gauge-center-line"></div>
                     <div id="gauge-power-fill"></div>
                     <div id="gauge-cursor" class="cursor-indicator" style="left:0%;"></div>
                 </div>
-                <div class="flex justify-between text-[9px] font-bold mt-1 px-1 text-slate-400 font-mono">
-                    <span>HOOK</span>
-                    <span>STRAIGHT</span>
-                    <span>SLICE</span>
-                </div>
             </div>
         </div>
 
         <div id="minimap-container"><canvas id="minimap-canvas"></canvas></div>
-
-        <div id="item-slots">
-            <div class="item-box" onclick="GameApp.useItem('POWER')"><span class="text-xl">💪</span><span class="text-[8px]">PWR</span></div>
-            <div class="item-box" onclick="GameApp.useItem('GUIDE')"><span class="text-xl">👁️</span><span class="text-[8px]">AIM</span></div>
-            <div class="item-box" onclick="GameApp.useItem('BRAKE')"><span class="text-xl">⚓</span><span class="text-[8px]">STOP</span></div>
-        </div>
 
         <div class="mobile-controls flex" id="mobile-controls">
             <div class="flex gap-4 items-end pb-4">
@@ -165,107 +152,80 @@
                 <button class="control-btn" id="btn-right">▶</button>
             </div>
             <div class="flex items-end pb-4">
-                <button class="control-btn shot-btn" id="btn-shot">SHOT</button>
+                <button class="control-btn shot-btn" id="btn-shot">HIT</button>
             </div>
-        </div>
-
-        <div id="shot-feedback" class="absolute top-[30%] left-1/2 transform -translate-x-1/2 text-center hidden pointer-events-none w-full z-50">
-             <h2 class="text-5xl font-black italic text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-orange-500 to-red-600 drop-shadow-2xl" style="-webkit-text-stroke: 1px white;">NICE!</h2>
         </div>
     </div>
 
     <!-- 결과 -->
     <div id="result-screen" class="hidden absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/90 backdrop-blur-md fade-in">
-        <h1 class="text-4xl md:text-6xl font-black text-yellow-400 font-sci mb-6">COMPLETE</h1>
-        <div class="bg-slate-800/80 p-6 rounded-2xl border border-slate-600 text-center modal-box shadow-2xl">
-            <div class="flex justify-between mb-4"><span class="text-slate-400">Shots</span><span class="text-2xl font-bold text-white" id="res-shots">0</span></div>
-            <div class="flex justify-between mb-6"><span class="text-slate-400">Score</span><span class="text-3xl font-black text-yellow-400" id="res-score">0</span></div>
-            <button id="btn-next-level" onclick="GameApp.nextLevel()" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl mb-3">NEXT 🚀</button>
-            <button onclick="GameApp.returnToLobby()" class="w-full bg-slate-700 hover:bg-slate-600 text-slate-200 font-bold py-3 rounded-xl">LOBBY</button>
+        <h1 class="text-6xl font-black text-yellow-400 font-sci mb-6">CLEAR!</h1>
+        <div class="bg-slate-800 p-8 rounded-2xl text-center">
+            <div class="text-4xl font-bold mb-4" id="res-score">0</div>
+            <button onclick="GameApp.returnToLobby()" class="bg-blue-600 px-8 py-3 rounded-xl font-bold hover:bg-blue-500">LOBBY</button>
         </div>
     </div>
 
     <div id="canvas-container" class="absolute inset-0 z-0"></div>
 
-    <!-- Firebase SDK (Modular) -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, getDocs, doc, onSnapshot, updateDoc, setDoc, query, where, limit } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        const firebaseConfig = JSON.parse(__firebase_config);
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-
-        let myUid = null;
-        let currentRoomId = null;
-        let roomUnsubscribe = null;
-
-        // --- Planet DB ---
+    <script>
+        // ==========================================
+        // 1. Planet DB
+        // ==========================================
         const PlanetDB = (() => {
-            const THEMES = [0x4ade80, 0xc2410c, 0x94a3b8, 0xbfdbfe, 0x7f1d1d];
             const planets = [];
             for(let i=0; i<300; i++) {
                 const mapSize = 4000;
                 const pathPoints = [new THREE.Vector3(0,0,mapSize/2-200)];
-                const segments = 4 + (i%3); 
-                for(let j=1; j<segments; j++) pathPoints.push(new THREE.Vector3((Math.random()-0.5)*2500, 0, (mapSize/2-200) - ((mapSize-400)*(j/segments))));
+                const segments = 4;
+                for(let j=1; j<segments; j++) pathPoints.push(new THREE.Vector3((Math.random()-0.5)*2000, 0, (mapSize/2-200) - ((mapSize-400)*(j/segments))));
                 pathPoints.push(new THREE.Vector3(0,0,-(mapSize/2-200)));
                 planets.push({
-                    id: i, name: `Planet-${i+1}`, gravity: 0.2 + (Math.random()*1.5), par: 3 + (i%3), color: THEMES[i%5],
-                    pathPoints, startPos: pathPoints[0], holePos: pathPoints[pathPoints.length-1], width: 150 + Math.random()*100 
+                    id: i, name: `Planet-${i+1}`, gravity: 0.3 + (Math.random()*1.2), par: 3, color: 0x4ade80,
+                    pathPoints, startPos: pathPoints[0], holePos: pathPoints[pathPoints.length-1], width: 150 
                 });
             }
             return {
-                get: (id) => planets[id % planets.length],
-                getRandom: () => planets[Math.floor(Math.random()*planets.length)],
-                getFiveRandom: () => { const s=[...planets].sort(()=>0.5-Math.random()); return s.slice(0,5); }
+                get: (id) => planets[id%300],
+                getRandom: () => planets[Math.floor(Math.random()*planets.length)]
             };
         })();
 
-        // --- Game App ---
-        window.GameApp = {
-            state: 'LOBBY', mode: null, currentStage: null, challengeQueue: [], challengeCurrent: 0,
-            items: { POWER: 3, GUIDE: 3, BRAKE: 3 }, startTime: 0, timerInterval: null,
+        // ==========================================
+        // 2. Game App & P2P Logic
+        // ==========================================
+        const GameApp = {
+            state: 'LOBBY', mode: null, currentStage: null, 
+            peer: null, conn: null, myId: null, isHost: false,
 
-            async init() {
-                // Auth
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
-                }
-                onAuthStateChanged(auth, (user) => {
-                    if(user) { myUid = user.uid; console.log("Auth:", myUid); }
-                });
-
+            init() {
                 ThreeScene.init();
                 this.updateUI();
                 this.setupTouchControls();
-                document.getElementById('loader').classList.add('hidden'); 
+                document.getElementById('loader').classList.add('hidden');
             },
 
             setupTouchControls() {
-                const btnLeft = document.getElementById('btn-left');
-                const btnRight = document.getElementById('btn-right');
-                const btnShot = document.getElementById('btn-shot');
-                const handlePress = (key, pressed) => { ThreeScene.setKey(key, pressed); };
-                const prevent = (e) => { if(e.cancelable) e.preventDefault(); };
-
-                btnLeft.addEventListener('touchstart', (e) => { prevent(e); handlePress('a', true); }, {passive:false});
-                btnLeft.addEventListener('touchend', (e) => { prevent(e); handlePress('a', false); });
-                btnRight.addEventListener('touchstart', (e) => { prevent(e); handlePress('d', true); }, {passive:false});
-                btnRight.addEventListener('touchend', (e) => { prevent(e); handlePress('d', false); });
-                btnShot.addEventListener('touchstart', (e) => { prevent(e); ThreeScene.triggerSpace(); btnShot.style.transform = "scale(0.9)"; }, {passive:false});
-                btnShot.addEventListener('touchend', (e) => { prevent(e); btnShot.style.transform = "scale(1)"; });
+                const press = (k,p) => ThreeScene.setKey(k,p);
+                const prevent = e => { if(e.cancelable) e.preventDefault(); };
+                
+                ['left','right'].forEach(dir => {
+                    const btn = document.getElementById(`btn-${dir}`);
+                    btn.addEventListener('touchstart', e=>{ prevent(e); press(dir==='left'?'a':'d', true); });
+                    btn.addEventListener('touchend', e=>{ prevent(e); press(dir==='left'?'a':'d', false); });
+                    btn.addEventListener('mousedown', ()=>press(dir==='left'?'a':'d', true));
+                    btn.addEventListener('mouseup', ()=>press(dir==='left'?'a':'d', false));
+                });
+                
+                const shot = document.getElementById('btn-shot');
+                shot.addEventListener('touchstart', e=>{ prevent(e); ThreeScene.triggerSpace(); shot.style.transform='scale(0.9)'; });
+                shot.addEventListener('touchend', e=>{ prevent(e); shot.style.transform='scale(1)'; });
+                shot.addEventListener('mousedown', ()=>{ ThreeScene.triggerSpace(); shot.style.transform='scale(0.9)'; });
+                shot.addEventListener('mouseup', ()=>{ shot.style.transform='scale(1)'; });
             },
 
             updateUI() {
-                ['lobby-screen','in-game-ui','result-screen','matching-screen'].forEach(id => {
-                    const el = document.getElementById(id); if(el) el.classList.add('hidden');
-                });
+                ['lobby-screen','in-game-ui','result-screen','p2p-modal'].forEach(id => document.getElementById(id).classList.add('hidden'));
                 if (this.state === 'LOBBY') document.getElementById('lobby-screen').classList.remove('hidden');
                 else if (this.state === 'IN_GAME') {
                     document.getElementById('in-game-ui').classList.remove('hidden');
@@ -276,157 +236,137 @@
 
             selectMode(mode) {
                 this.mode = mode;
-                if (mode === 'CHALLENGE') {
-                    this.challengeQueue = PlanetDB.getFiveRandom();
-                    this.challengeCurrent = 0;
-                    this.startGame(this.challengeQueue[0]);
-                } else this.startGame(PlanetDB.getRandom());
+                this.startGame(PlanetDB.getRandom());
             },
 
-            // --- Multiplayer Logic ---
-            async startRealMulti() {
-                if(!myUid) return;
-                this.mode = 'MULTI';
-                document.getElementById('lobby-screen').classList.add('hidden');
-                document.getElementById('matching-screen').classList.remove('hidden');
-                document.getElementById('match-msg').innerText = "Finding room...";
-
-                const roomsRef = collection(db, 'artifacts', appId, 'public', 'data', 'rooms');
-                // Simple search for waiting room
-                // Note: In strict env, queries might need index. We fallback to client filter if needed but try simple query first.
-                // Or just fetch all (assuming low traffic for prototype)
-                const snap = await getDocs(roomsRef);
-                let joinRoom = null;
+            // --- P2P Methods ---
+            openP2P(type) {
+                document.getElementById('p2p-modal').style.display = 'flex';
+                document.getElementById('p2p-host').classList.add('hidden');
+                document.getElementById('p2p-join').classList.add('hidden');
                 
-                snap.forEach(d => {
-                    const data = d.data();
-                    if(data.status === 'waiting' && (!data.players || Object.keys(data.players).length < 4)) {
-                        joinRoom = { id: d.id, ...data };
-                    }
-                });
-
-                if(joinRoom) {
-                    currentRoomId = joinRoom.id;
-                    const planetId = joinRoom.planetId;
-                    const roomDoc = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', currentRoomId);
-                    
-                    // Add player
-                    // Need to merge. We can't do deep merge easily without dot notation or reading first.
-                    // Let's assume we can use updateDoc with dot notation.
-                    await updateDoc(roomDoc, {
-                        [`players.${myUid}`]: { x:0, y:0, z:0, active:true }
+                if(!this.peer) {
+                    this.peer = new Peer(null, { debug: 2 }); // Random ID
+                    this.peer.on('open', (id) => {
+                        this.myId = id;
+                        if(type === 'HOST') this.setupHost();
                     });
-                    
-                    this.connectToRoom(currentRoomId, planetId);
+                    this.peer.on('connection', (c) => {
+                        this.conn = c;
+                        this.setupConnection();
+                    });
                 } else {
-                    // Create
-                    const pid = Math.floor(Math.random()*300);
-                    const newRoom = {
-                        host: myUid,
-                        planetId: pid,
-                        status: 'waiting',
-                        players: {
-                            [myUid]: { x:0, y:0, z:0, active:true }
-                        },
-                        createdAt: Date.now()
-                    };
-                    const res = await addDoc(roomsRef, newRoom);
-                    currentRoomId = res.id;
-                    this.connectToRoom(currentRoomId, pid);
+                    if(type === 'HOST') this.setupHost();
                 }
+                
+                if(type === 'JOIN') document.getElementById('p2p-join').classList.remove('hidden');
             },
 
-            connectToRoom(rid, pid) {
-                const roomDoc = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', rid);
-                roomUnsubscribe = onSnapshot(roomDoc, (snap) => {
-                    if(snap.exists()) {
-                        const data = snap.data();
-                        const pList = data.players || {};
-                        const count = Object.keys(pList).length;
-                        document.getElementById('multi-status').style.display = 'block';
-                        document.getElementById('multi-status').innerText = `🟢 ONLINE: ${count} Players`;
-                        ThreeScene.updateRemotePlayers(pList, myUid);
+            setupHost() {
+                this.isHost = true;
+                document.getElementById('p2p-host').classList.remove('hidden');
+                // Use last 5 chars as code for simplicity (Collision possible but low for demo)
+                const code = this.myId.substr(-5).toUpperCase();
+                document.getElementById('room-code-display').innerText = code;
+            },
+
+            connectToPeer() {
+                const code = document.getElementById('room-code-input').value.trim();
+                if(code.length < 5) return alert("Invalid Code");
+                
+                // Hack: We need full ID. In real app, use matchmaking server or full ID.
+                // Here we assume players are exchanging full IDs or we use a deterministic ID prefix.
+                // For this prototype, we ask user to input FULL ID if 5 chars fails? 
+                // Let's rely on manual ID entry for robustness or basic peerjs functionality.
+                // Wait, PeerJS IDs are long. Let's just alert the Full ID to the user for now.
+                // Better: The host sees the full ID.
+                // Update: Let's just use the Input value as the Peer ID.
+                
+                // User enters the FULL ID they saw on host screen (We will show full ID)
+                this.isHost = false;
+                this.conn = this.peer.connect(code); // Connect to peer
+                this.setupConnection();
+            },
+            
+            // Override setupHost to show full ID because partial ID lookup needs a server
+            setupHost() {
+                this.isHost = true;
+                document.getElementById('p2p-host').classList.remove('hidden');
+                document.getElementById('room-code-display').innerText = this.myId; // Show Full ID
+                document.getElementById('room-code-display').style.fontSize = "16px";
+            },
+
+            setupConnection() {
+                this.conn.on('open', () => {
+                    document.getElementById('p2p-modal').style.display = 'none';
+                    document.getElementById('multi-status').style.display = 'block';
+                    
+                    if(this.isHost) {
+                        // Host selects map and sends to guest
+                        const pid = Math.floor(Math.random()*300);
+                        this.conn.send({ type: 'START', planetId: pid });
+                        this.startGame(PlanetDB.get(pid));
                     }
                 });
-                document.getElementById('matching-screen').classList.add('hidden');
-                this.startGame(PlanetDB.get(pid));
+
+                this.conn.on('data', (data) => {
+                    if(data.type === 'START') {
+                        this.startGame(PlanetDB.get(data.planetId));
+                    }
+                    if(data.type === 'POS') {
+                        ThreeScene.updateRemoteBall(data.pos);
+                    }
+                });
             },
 
-            updateMyPos(pos) {
-                if(this.mode === 'MULTI' && currentRoomId && myUid) {
-                    const roomDoc = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', currentRoomId);
-                    updateDoc(roomDoc, {
-                        [`players.${myUid}.x`]: pos.x,
-                        [`players.${myUid}.y`]: pos.y,
-                        [`players.${myUid}.z`]: pos.z
-                    }).catch(()=>{});
+            closeP2P() {
+                document.getElementById('p2p-modal').style.display = 'none';
+                if(this.conn) this.conn.close();
+            },
+            
+            copyCode() {
+                navigator.clipboard.writeText(this.myId);
+                document.getElementById('copy-msg').innerText = "COPIED!";
+                setTimeout(()=>document.getElementById('copy-msg').innerText="Click to copy", 1000);
+            },
+
+            sendMyPos(pos) {
+                if(this.conn && this.conn.open) {
+                    this.conn.send({ type: 'POS', pos: pos });
                 }
             },
 
             startGame(stageData) {
                 this.state = 'IN_GAME';
                 this.currentStage = stageData;
-                const itemEl = document.getElementById('item-slots');
-                if(itemEl) itemEl.style.display = (this.mode === 'CASUAL') ? 'flex' : 'none';
                 this.updateUI();
-                this.startTime = Date.now();
-                if(this.timerInterval) clearInterval(this.timerInterval);
-                this.timerInterval = setInterval(()=>{
-                    const d = Date.now()-this.startTime;
-                    const m = Math.floor(d/60000).toString().padStart(2,'0');
-                    const s = Math.floor((d%60000)/1000).toString().padStart(2,'0');
-                    const tEl = document.getElementById('hud-timer');
-                    if(tEl) tEl.innerText = `${m}:${s}`;
-                }, 100);
                 ThreeScene.initStage(this.currentStage);
             },
 
             finishStage(shots) {
-                clearInterval(this.timerInterval);
                 this.state = 'RESULT';
                 this.updateUI();
-                document.getElementById('res-shots').innerText = shots;
-                document.getElementById('res-score').innerText = Math.max(0, 1000 + (this.currentStage.par - shots)*500);
-                const btnNext = document.getElementById('btn-next-level');
-                if (this.mode === 'CHALLENGE') {
-                    this.challengeCurrent++;
-                    if(this.challengeCurrent >= 5) btnNext.style.display = 'none';
-                    else btnNext.style.display = 'block';
-                } else btnNext.style.display = 'block';
+                document.getElementById('res-score').innerText = shots;
             },
 
-            nextLevel() {
-                if (this.mode === 'CHALLENGE') this.startGame(this.challengeQueue[this.challengeCurrent]);
-                else this.startGame(PlanetDB.getRandom());
-            },
-
-            returnToLobby() { 
-                this.state = 'LOBBY'; 
-                if(roomUnsubscribe) { roomUnsubscribe(); roomUnsubscribe=null; }
-                document.getElementById('multi-status').style.display='none';
-                this.updateUI(); 
-            },
-            useItem(type) { if(this.mode==='CASUAL' && this.items[type]>0) { ThreeScene.useItem(type); this.items[type]--; } }
+            returnToLobby() { this.state = 'LOBBY'; this.updateUI(); },
         };
 
-        // --- Three.js ---
+        // ==========================================
+        // 3. Three.js Scene
+        // ==========================================
         const ThreeScene = (() => {
             let scene, camera, renderer, ball, terrainMesh;
             let gaugeState=0, gaugeVals={p:0,h:0,c:0}, gaugeAnim={pos:0,dir:1};
             let physics={vel:new THREE.Vector3(), moving:false};
-            let stageData, aimAngle=0, orbitAngle=0, shots=0, itemActive=null;
-            let miniCtx, minimapBg;
-            let keys = {a:false, d:false};
-            let pathLut = [];
-            let gaugeLock = false;
-            let remoteMeshes = {}; // uid -> mesh
+            let stageData, aimAngle=0, orbitAngle=0, shots=0;
+            let miniCtx, minimapBg, keys={a:false, d:false};
+            let remoteBall; 
 
             function init() {
                 const container = document.getElementById('canvas-container');
                 if(!container) return;
-                scene = new THREE.Scene(); 
-                scene.background = new THREE.Color(0x050505); 
-                scene.fog = new THREE.Fog(0x050505, 200, 3000);
+                scene = new THREE.Scene(); scene.background = new THREE.Color(0x050505); scene.fog = new THREE.Fog(0x050505, 200, 3000);
                 camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 8000);
                 renderer = new THREE.WebGLRenderer({antialias:true});
                 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -437,10 +377,10 @@
                 const sun = new THREE.DirectionalLight(0xffffff, 1.2); 
                 sun.position.set(500,1000,500); sun.castShadow=true;
                 sun.shadow.mapSize.set(2048,2048);
-                sun.shadow.camera.far=5000; 
-                sun.shadow.camera.left=-2000; sun.shadow.camera.right=2000; 
-                sun.shadow.camera.top=2000; sun.shadow.camera.bottom=-2000;
+                sun.shadow.camera.far=5000; sun.shadow.camera.left=-2000; sun.shadow.camera.right=2000; sun.shadow.camera.top=2000; sun.shadow.camera.bottom=-2000;
                 scene.add(sun);
+                
+                // Stars
                 const sg = new THREE.BufferGeometry(); const sp = [];
                 for(let i=0; i<3000; i++) sp.push((Math.random()-0.5)*8000, (Math.random()-0.5)*4000+2000, (Math.random()-0.5)*8000);
                 sg.setAttribute('position', new THREE.Float32BufferAttribute(sp,3));
@@ -450,63 +390,39 @@
                 if(mc) { miniCtx = mc.getContext('2d'); mc.width=300; mc.height=300; }
 
                 animate();
-                window.addEventListener('resize', ()=>{
-                    camera.aspect=window.innerWidth/window.innerHeight; camera.updateProjectionMatrix();
-                    renderer.setSize(window.innerWidth, window.innerHeight);
-                });
+                
+                window.addEventListener('resize', ()=>{ camera.aspect=window.innerWidth/window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); });
                 window.addEventListener('keydown', (e) => {
                     if(e.code==='Space') triggerSpace();
-                    if(e.code==='KeyA') keys.a = true;
-                    if(e.code==='KeyD') keys.d = true;
+                    if(e.code==='KeyA') keys.a = true; if(e.code==='KeyD') keys.d = true;
                     if(e.code==='KeyR') resetBall();
                 });
-                window.addEventListener('keyup', (e) => {
-                    if(e.code==='KeyA') keys.a = false;
-                    if(e.code==='KeyD') keys.d = false;
-                });
+                window.addEventListener('keyup', (e) => { if(e.code==='KeyA') keys.a = false; if(e.code==='KeyD') keys.d = false; });
                 
-                let isDrag = false, lastX = 0;
-                const handleStart = (x) => { if(physics.moving) { isDrag=true; lastX=x; } };
-                const handleMove = (x) => { if(isDrag) { orbitAngle += (x-lastX)*0.01; lastX=x; } };
-                const handleEnd = () => { isDrag=false; };
-                window.addEventListener('mousedown', (e)=>handleStart(e.clientX));
-                window.addEventListener('mousemove', (e)=>handleMove(e.clientX));
-                window.addEventListener('mouseup', handleEnd);
-                window.addEventListener('touchstart', (e)=>{ if(!e.target.closest('.control-btn')) handleStart(e.touches[0].clientX); }, {passive:false});
-                window.addEventListener('touchmove', (e)=>handleMove(e.touches[0].clientX), {passive:false});
-                window.addEventListener('touchend', handleEnd);
+                let isDrag=false, lastX=0;
+                const hStart=x=>{if(physics.moving){isDrag=true; lastX=x;}};
+                const hMove=x=>{if(isDrag){orbitAngle+=(x-lastX)*0.01; lastX=x;}};
+                const hEnd=()=>{isDrag=false;};
+                window.addEventListener('mousedown',e=>hStart(e.clientX)); window.addEventListener('mousemove',e=>hMove(e.clientX)); window.addEventListener('mouseup',hEnd);
+                window.addEventListener('touchstart',e=>{if(!e.target.closest('.control-btn'))hStart(e.touches[0].clientX);},{passive:false});
+                window.addEventListener('touchmove',e=>hMove(e.touches[0].clientX),{passive:false}); window.addEventListener('touchend',hEnd);
             }
 
-            function updateRemotePlayers(players, myUid) {
-                // Remove disconnected
-                for(let uid in remoteMeshes) {
-                    if(!players[uid]) { scene.remove(remoteMeshes[uid]); delete remoteMeshes[uid]; }
+            function updateRemoteBall(pos) {
+                if(!remoteBall) {
+                    remoteBall = new THREE.Mesh(new THREE.SphereGeometry(2,16,16), new THREE.MeshBasicMaterial({color:0x00ffff, wireframe:true}));
+                    scene.add(remoteBall);
                 }
-                // Update/Add
-                for(let uid in players) {
-                    if(uid === myUid) continue;
-                    const p = players[uid];
-                    if(!remoteMeshes[uid]) {
-                        const m = new THREE.Mesh(new THREE.SphereGeometry(2,16,16), new THREE.MeshBasicMaterial({color:0x00ffff, wireframe:true}));
-                        scene.add(m);
-                        remoteMeshes[uid] = m;
-                    }
-                    remoteMeshes[uid].position.set(p.x, p.y, p.z);
-                }
+                remoteBall.position.set(pos.x, pos.y, pos.z);
             }
 
             function initStage(data) {
                 if(!scene) init();
                 stageData = data; shots=0; physics.vel.set(0,0,0); physics.moving=false; gaugeState=0;
                 
-                // Clear remotes
-                for(let uid in remoteMeshes) { scene.remove(remoteMeshes[uid]); }
-                remoteMeshes = {};
-
-                const nameEl = document.getElementById('hud-planet-name'); if(nameEl) nameEl.innerText = data.name;
-                const infoEl = document.getElementById('hud-planet-info'); if(infoEl) infoEl.innerText = `${data.gravity.toFixed(2)}g | Par ${data.par}`;
+                document.getElementById('hud-planet-name').innerText = data.name;
+                document.getElementById('hud-planet-info').innerText = `${data.gravity.toFixed(2)}g | Par ${data.par}`;
                 document.getElementById('hud-shots').innerText = 0;
-                
                 document.getElementById('gauge-container-group').style.display = 'flex';
                 document.getElementById('gauge-container-group').classList.remove('hidden');
                 document.getElementById('minimap-container').style.display = 'block';
@@ -514,27 +430,29 @@
 
                 if(terrainMesh) { scene.remove(terrainMesh); terrainMesh.geometry.dispose(); }
                 if(ball) scene.remove(ball);
+                if(remoteBall) { scene.remove(remoteBall); remoteBall=null; }
 
+                // Terrain
                 const mapSize=4000, seg=150;
                 const geo=new THREE.PlaneGeometry(mapSize,mapSize,seg,seg); geo.rotateX(-Math.PI/2);
                 const pos=geo.attributes.position; const colors=[];
                 const curve=new THREE.CatmullRomCurve3(data.pathPoints);
-                pathLut=curve.getSpacedPoints(150); 
+                const lut=curve.getSpacedPoints(150); 
 
                 for(let i=0; i<pos.count; i++){
                     const x=pos.getX(i), z=pos.getZ(i);
-                    let minDist=Infinity;
-                    for(let k=0; k<pathLut.length; k+=3) { 
-                        const d = (x-pathLut[k].x)**2 + (z-pathLut[k].z)**2;
-                        if(d<minDist) minDist=d;
+                    let minD=Infinity;
+                    for(let k=0; k<lut.length; k+=3) { 
+                        const d = (x-lut[k].x)**2 + (z-lut[k].z)**2;
+                        if(d<minD) minD=d;
                     }
-                    minDist = Math.sqrt(minDist);
+                    minD = Math.sqrt(minD);
                     let y=0, c=new THREE.Color();
-                    const distH = Math.sqrt((x-data.holePos.x)**2+(z-data.holePos.z)**2);
-                    if(distH<30) { y=0; c.setHex(0x22c55e); }
-                    else if(minDist < data.width) { y=Math.sin(x*0.02)*2; c.setHex(data.color); }
-                    else if(minDist < data.width*2) { y=10; c.setHex(0x57534e); }
-                    else { y=30+(minDist-data.width*2)*0.5; c.setHex(0x292524); }
+                    const dH = Math.sqrt((x-data.holePos.x)**2+(z-data.holePos.z)**2);
+                    if(dH<30) { y=0; c.setHex(0x22c55e); }
+                    else if(minD < data.width) { y=Math.sin(x*0.02)*2; c.setHex(data.color); }
+                    else if(minD < data.width*2) { y=10; c.setHex(0x57534e); }
+                    else { y=30+(minD-data.width*2)*0.5; c.setHex(0x292524); }
                     pos.setY(i,y); colors.push(c.r,c.g,c.b);
                 }
                 geo.setAttribute('color', new THREE.Float32BufferAttribute(colors,3)); geo.computeVertexNormals();
@@ -552,8 +470,7 @@
 
                 const dir = new THREE.Vector3().subVectors(data.holePos, data.startPos).normalize();
                 aimAngle = Math.atan2(-dir.x, -dir.z); orbitAngle=aimAngle;
-                
-                setTimeout(drawMinimap, 200);
+                setTimeout(drawMinimap, 500);
             }
 
             const ray = new THREE.Raycaster(); const down = new THREE.Vector3(0,-1,0);
@@ -580,34 +497,26 @@
                 if(gaugeState > 0) {
                     gaugeAnim.pos += 2.5 * gaugeAnim.dir;
                     if(gaugeAnim.pos>=100||gaugeAnim.pos<=0) gaugeAnim.dir*=-1;
-                    if(gaugeState!==2) {
-                        const cur = document.getElementById('gauge-cursor'); if(cur) cur.style.left=gaugeAnim.pos+'%';
-                        const fill = document.getElementById('gauge-power-fill'); if(gaugeState===1 && fill) fill.style.width=gaugeAnim.pos+'%';
-                    } else {
-                        const hCur = document.getElementById('gauge-height-cursor'); if(hCur) hCur.style.bottom=gaugeAnim.pos+'%';
-                        const hFill = document.getElementById('gauge-height-fill'); if(hFill) hFill.style.height=gaugeAnim.pos+'%';
+                    const cur = document.getElementById('gauge-cursor');
+                    if(cur) {
+                        if(gaugeState === 3) cur.classList.add('cursor-curve'); else cur.classList.remove('cursor-curve');
+                        if(gaugeState!==2) {
+                            cur.style.left=gaugeAnim.pos+'%';
+                            if(gaugeState===1) document.getElementById('gauge-power-fill').style.width=gaugeAnim.pos+'%';
+                        } else {
+                            document.getElementById('gauge-height-cursor').style.bottom=gaugeAnim.pos+'%';
+                            document.getElementById('gauge-height-fill').style.height=gaugeAnim.pos+'%';
+                        }
                     }
                 }
 
                 if(physics.moving) {
-                    const dt=0.016; const steps=4; const stepDt = dt / steps;
-                    let syncCounter = 0;
+                    const dt=0.016, steps=4, stepDt=dt/steps;
+                    let sync=0;
                     for(let s=0; s<steps; s++) {
                         physics.vel.y -= (9.8*stageData.gravity)*stepDt;
-                        let nextPos = ball.position.clone().add(physics.vel.clone().multiplyScalar(stepDt * 20.0));
+                        let nextPos = ball.position.clone().add(physics.vel.clone().multiplyScalar(stepDt*20.0));
                         
-                        let closestPt = pathLut[0];
-                        let minDistSq = Infinity;
-                        for(let k=0; k<pathLut.length; k+=5) {
-                            const d = (nextPos.x-pathLut[k].x)**2 + (nextPos.z-pathLut[k].z)**2;
-                            if(d < minDistSq) { minDistSq = d; closestPt = pathLut[k]; }
-                        }
-                        if(Math.sqrt(minDistSq) > stageData.width * 2.5) {
-                            physics.vel.x *= -0.5; physics.vel.z *= -0.5;
-                            const pushDir = new THREE.Vector3().subVectors(closestPt, nextPos).normalize();
-                            nextPos.add(pushDir.multiplyScalar(10)); 
-                        }
-
                         const gy = getTerrainHeight(nextPos.x, nextPos.z);
                         if(nextPos.y <= gy+2) {
                             nextPos.y = gy+2;
@@ -624,12 +533,8 @@
                         ball.position.copy(nextPos);
                         if(ball.position.y<-100) { resetBall(); break; }
                     }
-                    // Network Sync Throttled
-                    syncCounter++;
-                    if(syncCounter > 5) {
-                        GameApp.updateMyPos(ball.position);
-                        syncCounter = 0;
-                    }
+                    sync++;
+                    if(sync>5) { GameApp.sendMyPos(ball.position); sync=0; }
                 }
 
                 let ct, dist=60;
@@ -641,36 +546,28 @@
                 renderer.render(scene, camera);
             }
 
+            let gaugeLock = false;
             function triggerSpace() {
                 if(physics.moving || gaugeLock) return;
-                gaugeLock = true;
-                setTimeout(() => { gaugeLock = false; }, 200);
-
+                gaugeLock = true; setTimeout(() => { gaugeLock = false; }, 200);
                 const stat = document.getElementById('gauge-status');
-                if(gaugeState === 0) { 
-                    gaugeState = 1; gaugeAnim.pos = 0; gaugeAnim.dir = 1; stat.innerText = "TAP: POWER"; 
-                } else if(gaugeState === 1) { 
-                    gaugeVals.p = gaugeAnim.pos; gaugeState = 2; gaugeAnim.pos = 0; gaugeAnim.dir = 1; stat.innerText = "TAP: HEIGHT"; 
-                } else if(gaugeState === 2) { 
-                    gaugeVals.h = gaugeAnim.pos; gaugeState = 3; gaugeAnim.pos = 50; gaugeAnim.dir = 1; stat.innerText = "TAP: CURVE"; 
-                } else if(gaugeState === 3) { 
-                    gaugeVals.c = (gaugeAnim.pos - 50) / 50; shoot(); 
-                }
+                if(gaugeState === 0) { gaugeState = 1; gaugeAnim.pos = 0; gaugeAnim.dir = 1; stat.innerText = "TAP: POWER"; }
+                else if(gaugeState === 1) { gaugeVals.p = gaugeAnim.pos; gaugeState = 2; gaugeAnim.pos = 0; gaugeAnim.dir = 1; stat.innerText = "TAP: HEIGHT"; }
+                else if(gaugeState === 2) { gaugeVals.h = gaugeAnim.pos; gaugeState = 3; gaugeAnim.pos = 50; gaugeAnim.dir = 1; stat.innerText = "TAP: CURVE"; }
+                else if(gaugeState === 3) { gaugeVals.c = (gaugeAnim.pos - 50) / 50; shoot(); }
             }
 
             function shoot() {
                 gaugeState=0; shots++;
                 document.getElementById('hud-shots').innerText=shots;
                 document.getElementById('gauge-container-group').style.display='none';
-                
                 let p = gaugeVals.p/100 * 85; 
-                if(itemActive==='POWER') p*=1.5;
                 const ang = (15 + (gaugeVals.h/100)*60) * (Math.PI/180);
                 const cur = gaugeVals.c*0.5;
                 const fa = aimAngle+cur;
                 const vxz = p*Math.cos(ang); const vy=p*Math.sin(ang);
                 physics.vel.set(-Math.sin(fa)*vxz, vy, -Math.cos(fa)*vxz);
-                physics.moving=true; orbitAngle=aimAngle; itemActive=null;
+                physics.moving=true; orbitAngle=aimAngle;
             }
 
             function resetBall() {
@@ -683,7 +580,7 @@
                 document.getElementById('gauge-power-fill').style.width='0%';
                 document.getElementById('gauge-height-fill').style.height='0%';
                 gaugeState = 0; 
-                GameApp.updateMyPos(ball.position);
+                GameApp.sendMyPos(ball.position);
             }
 
             function checkWin() {
@@ -694,61 +591,36 @@
                     document.getElementById('gauge-status').innerText="TAP SHOT";
                     gaugeState = 0; 
                 }
-                GameApp.updateMyPos(ball.position);
+                GameApp.sendMyPos(ball.position);
             }
 
             function drawMinimap() {
                 if(!miniCtx || !stageData) return;
-                const size = 300;
-                miniCtx.fillStyle='#000'; miniCtx.fillRect(0,0,size,size);
-                
-                miniCtx.lineWidth = 15;
-                miniCtx.lineCap = 'round';
-                miniCtx.lineJoin = 'round';
-                miniCtx.strokeStyle = '#22c55e'; 
-                miniCtx.beginPath();
-                
-                const mapScale = size / 4000;
-                const offset = 2000;
-                
-                pathLut.forEach((pt, i) => {
-                    const mx = (pt.x + offset) * mapScale;
-                    const my = (pt.z + offset) * mapScale;
-                    if(i===0) miniCtx.moveTo(mx, my);
-                    else miniCtx.lineTo(mx, my);
-                });
-                miniCtx.stroke();
-
+                miniCtx.fillStyle='#000'; miniCtx.fillRect(0,0,300,300);
+                // Draw path...
+                const mapScale = 300 / 4000; const offset = 2000;
                 const sx=(stageData.startPos.x+offset)*mapScale; const sz=(stageData.startPos.z+offset)*mapScale;
                 const hx=(stageData.holePos.x+offset)*mapScale; const hz=(stageData.holePos.z+offset)*mapScale;
                 miniCtx.fillStyle='#fff'; miniCtx.beginPath(); miniCtx.arc(sx,sz,4,0,Math.PI*2); miniCtx.fill();
                 miniCtx.fillStyle='#ef4444'; miniCtx.beginPath(); miniCtx.arc(hx,hz,6,0,Math.PI*2); miniCtx.fill();
-                minimapBg=miniCtx.getImageData(0,0,size,size);
+                minimapBg=miniCtx.getImageData(0,0,300,300);
             }
             function updateMinimap() {
                 if(!minimapBg || !miniCtx) return;
                 miniCtx.putImageData(minimapBg,0,0);
-                const mapScale = 300 / 4000;
-                const offset = 2000;
-                const bx = (ball.position.x + offset) * mapScale;
-                const bz = (ball.position.z + offset) * mapScale;
+                const mapScale = 300 / 4000; const offset = 2000;
+                const bx=(ball.position.x+offset)*mapScale; const bz=(ball.position.z+offset)*mapScale;
                 miniCtx.fillStyle='#fff'; miniCtx.beginPath(); miniCtx.arc(bx,bz,3,0,Math.PI*2); miniCtx.fill();
-                miniCtx.strokeStyle='#000'; miniCtx.lineWidth=1; miniCtx.stroke();
                 
-                // Draw Remote Players
-                for(let uid in remoteMeshes) {
-                    const rp = remoteMeshes[uid].position;
-                    const rx = (rp.x + offset) * mapScale;
-                    const rz = (rp.z + offset) * mapScale;
+                // Remote
+                if(remoteBall) {
+                    const rx=(remoteBall.position.x+offset)*mapScale; const rz=(remoteBall.position.z+offset)*mapScale;
                     miniCtx.fillStyle='#0ff'; miniCtx.beginPath(); miniCtx.arc(rx,rz,2,0,Math.PI*2); miniCtx.fill();
                 }
             }
 
-            function stopBall() { if(physics.moving) { physics.vel.set(0,0,0); physics.moving=false; checkWin(); }}
-            function useItem(t) { if(t==='BRAKE') stopBall(); if(t==='POWER') itemActive='POWER'; }
             function setKey(k,v) { keys[k]=v; }
-
-            return { init, initStage, resetBall, setKey, triggerSpace, useItem, updateRemotePlayers };
+            return { init, initStage, resetBall, setKey, triggerSpace, updateRemoteBall };
         })();
 
         window.onload = () => GameApp.init();
