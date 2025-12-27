@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>리얼 우주 중력 골프 (Power, Height & Curve)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #000; }
+        .font-space { font-family: 'Courier New', Courier, monospace; }
+        
+        /* 전체 게이지 컨테이너 */
+        #gauge-container-group {
+            position: absolute;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            align-items: flex-end;
+            gap: 15px;
+            display: none; /* 샷 할때만 표시 */
+        }
+
+        /* --- 세로 게이지 (높이) --- */
+        #gauge-height-wrapper {
+            position: relative;
+            width: 30px;
+            height: 120px;
+            background: #222;
+            border: 2px solid #888;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        #gauge-height-fill {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 0%;
+            background: linear-gradient(0deg, #3b82f6 0%, #a855f7 100%);
+            opacity: 0.8;
+            transition: opacity 0.3s;
+        }
+        #gauge-height-cursor {
+            position: absolute;
+            bottom: 0%;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: #fff;
+            border: 1px solid #000;
+            box-shadow: 0 0 5px #fff;
+            z-index: 10;
+        }
+        #height-label {
+            position: absolute;
+            top: -20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 10px;
+            color: #a855f7;
+            font-weight: bold;
+            white-space: nowrap;
+        }
+
+        /* --- 가로 게이지 (파워/커브) --- */
+        #gauge-horizontal-wrapper {
+            position: relative;
+            width: 400px;
+            height: 70px; 
+        }
+        #gauge-bar {
+            position: relative;
+            width: 100%;
+            height: 24px;
+            background: #222;
+            border: 2px solid #888;
+            border-radius: 12px;
+            overflow: hidden;
+            margin-top: 10px;
+        }
+        #gauge-power-fill {
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #4ade80 0%, #facc15 100%);
+            opacity: 0.8;
+            transition: opacity 0.3s;
+        }
+        #gauge-center-line {
+            position: absolute;
+            top: 0;
+            left: 50%;
+            width: 2px;
+            height: 100%;
+            background: #fff;
+            z-index: 5;
+            box-shadow: 0 0 5px #fff;
+        }
+        .gauge-label {
+            position: absolute;
+            top: 38px;
+            font-size: 10px;
+            color: #666;
+            font-weight: bold;
+        }
+        #label-left { left: 5%; color: #ef4444; }
+        #label-center { left: 50%; transform: translateX(-50%); color: #fff; }
+        #label-right { right: 5%; color: #3b82f6; }
+        #gauge-cursor {
+            position: absolute;
+            top: -4px;
+            left: 0%;
+            width: 4px;
+            height: 32px;
+            background: #fff;
+            border: 1px solid #000;
+            box-shadow: 0 0 5px #fff;
+            z-index: 10;
+            transform: translateX(-50%);
+        }
+
+        /* 상태 텍스트 */
+        #gauge-status {
+            position: absolute;
+            top: -30px;
+            width: 100%;
+            text-align: center;
+            color: #fbbf24;
+            font-weight: bold;
+            font-size: 14px;
+            text-shadow: 1px 1px 2px black;
+        }
+    </style>
+</head>
+<body class="text-white select-none">
+
+    <!-- UI Overlay -->
+    <div id="ui-layer" class="absolute inset-0 pointer-events-none flex flex-col justify-between p-4 z-10">
+        <!-- Top HUD -->
+        <div class="flex justify-between items-start">
+            <div class="bg-slate-900/80 p-3 rounded-lg border border-slate-700 backdrop-blur-sm">
+                <h1 class="text-xl font-bold text-yellow-400 font-space shadow-black drop-shadow-md">🪐 <span id="planet-name">MARS FIELD</span></h1>
+                <div class="mt-1 text-xs text-blue-300">중력: <span id="gravity-display">0.38</span>g</div>
+            </div>
+            
+            <div class="bg-slate-900/80 p-3 rounded-lg border border-slate-700 backdrop-blur-sm text-right">
+                <div class="text-lg font-bold">PAR: <span id="par-display">4</span></div>
+                <div class="text-xs text-slate-400">SHOTS: <span id="shot-count" class="text-green-400">0</span></div>
+            </div>
+        </div>
+
+        <!-- Center Message -->
+        <div id="message-area" class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center hidden pointer-events-auto z-20">
+            <div class="bg-black/80 p-8 rounded-2xl border border-yellow-500/50 backdrop-blur-md shadow-2xl">
+                <h2 id="message-title" class="text-4xl font-bold mb-2 text-yellow-400 drop-shadow-lg">HOLE IN!</h2>
+                <p id="message-desc" class="text-lg mb-6 text-slate-200">나이스 샷!</p>
+                <button id="next-btn" class="bg-yellow-500 hover:bg-yellow-600 text-black font-bold py-3 px-8 rounded-full shadow-lg transition transform hover:scale-105 pointer-events-auto">
+                    다음 코스
+                </button>
+            </div>
+        </div>
+        
+        <!-- Shot Feedback Message -->
+        <div id="shot-feedback" class="absolute top-1/3 left-1/2 transform -translate-x-1/2 text-center hidden z-20">
+             <h2 class="text-6xl font-black italic text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 via-red-500 to-pink-500 drop-shadow-2xl" style="-webkit-text-stroke: 2px white;">CURVE!</h2>
+        </div>
+
+        <!-- Controls Help -->
+        <div class="absolute top-20 left-4 text-xs text-slate-400 bg-black/50 p-2 rounded">
+            <p>⌨️ <span class="text-white font-bold">A / D</span> : 에임(시야) 조절</p>
+            <p>⚡ <span class="text-white font-bold">SPACE (4단계)</span> : 시작 → 파워 → 높이(세로) → 커브</p>
+            <p>🔄 <span class="text-white font-bold">R</span> : 공 위치 초기화</p>
+        </div>
+
+        <!-- Gauge UI Group -->
+        <div id="gauge-container-group">
+            
+            <!-- 세로: 높이 -->
+            <div id="gauge-height-wrapper">
+                <div id="height-label">HEIGHT</div>
+                <div id="gauge-height-fill"></div>
+                <div id="gauge-height-cursor"></div>
+            </div>
+
+            <!-- 가로: 파워 & 커브 -->
+            <div id="gauge-horizontal-wrapper">
+                <div id="gauge-status">SPACE를 눌러 샷 시작</div>
+                <div id="gauge-bar">
+                    <div id="gauge-center-line"></div>
+                    <div id="gauge-power-fill"></div>
+                    <div id="gauge-cursor"></div>
+                </div>
+                <span id="label-left" class="gauge-label">HOOK (좌)</span>
+                <span id="label-center" class="gauge-label">STRAIGHT</span>
+                <span id="label-right" class="gauge-label">SLICE (우)</span>
+            </div>
+        </div>
+    </div>
+
+    <div id="canvas-container" class="absolute inset-0 z-0"></div>
+
+    <script>
+        // --- 1. Three.js Setup ---
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x0a0a0a);
+        scene.fog = new THREE.Fog(0x0a0a0a, 50, 500);
+
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        container.appendChild(renderer.domElement);
+
+        // Lights
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+        scene.add(ambientLight);
+
+        const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
+        dirLight.position.set(50, 100, 50);
+        dirLight.castShadow = true;
+        scene.add(dirLight);
+
+        // --- 2. Game Variables ---
+        // GAUGE_POWER: 1단계 (가로 - 파워)
+        // GAUGE_HEIGHT: 2단계 (세로 - 높이)
+        // GAUGE_CURVE: 3단계 (가로 - 커브)
+        const STATE = { AIMING: 0, GAUGE_POWER: 1, GAUGE_HEIGHT: 2, GAUGE_CURVE: 3, MOVING: 4, HOLED: 5 };
+        let gameState = STATE.AIMING;
+        
+        let ball, terrain, goal;
+        let aimArrow;
+        let aimAngle = 0; 
+        let cameraDistance = 30;
+        let cameraHeight = 15;
+
+        // Physics Tuning
+        let ballVelocity = new THREE.Vector3(0, 0, 0);
+        let gravity = 9.8 * 0.38; 
+        let friction = 0.98; 
+        let restitution = 0.7; 
+        let wallRestitution = 0.9; 
+
+        // Gauge Logic Variables
+        // Horizontal (Power/Curve)
+        let gaugeCursorPos = 0; 
+        let gaugeDirection = 1; 
+        // Vertical (Height)
+        let heightCursorPos = 0;
+        let heightDirection = 1;
+
+        // Values to Store
+        let gaugePowerVal = 0; 
+        let gaugeHeightVal = 0;
+        let gaugeCurveVal = 0;
+        
+        let gaugeSpeed = 1.5; 
+        
+        // Stage Data
+        const STAGES = [
+            {
+                name: "MARS CRATER",
+                gravity: 0.38, // Mars
+                par: 3,
+                color: 0x8c3b28, // Reddish
+                startPos: { x: 0, y: 2, z: 40 },
+                holePos: { x: 0, y: 0, z: -40 },
+                obstacles: [
+                    { x: -15, y: 0, z: 0, w: 10, h: 5, d: 10 },
+                    { x: 15, y: 0, z: 0, w: 10, h: 5, d: 10 }
+                ]
+            },
+            {
+                name: "MOON DUST",
+                gravity: 0.16, // Moon
+                par: 4,
+                color: 0x555555, // Grey
+                startPos: { x: -30, y: 2, z: 60 },
+                holePos: { x: 30, y: 0, z: -60 },
+                obstacles: [
+                    { x: 0, y: 0, z: 0, w: 20, h: 10, d: 20 },
+                    { x: -20, y: 0, z: 30, w: 10, h: 4, d: 10 }
+                ]
+            },
+            {
+                name: "JUPITER GRAVITY",
+                gravity: 2.5, // Jupiter (Heavy!)
+                par: 5,
+                color: 0xc88b3a, // Orange/Brown
+                startPos: { x: 0, y: 2, z: 80 },
+                holePos: { x: 0, y: 0, z: -80 },
+                obstacles: [
+                    { x: -10, y: 0, z: 40, w: 30, h: 2, d: 5 },
+                    { x: 10, y: 0, z: 0, w: 30, h: 2, d: 5 },
+                    { x: -10, y: 0, z: -40, w: 30, h: 2, d: 5 }
+                ]
+            }
+        ];
+        let currentStageIdx = 0;
+        let shots = 0;
+
+        // --- 3. Object Creation Helpers ---
+
+        function createStarField() {
+            const geometry = new THREE.BufferGeometry();
+            const vertices = [];
+            for (let i = 0; i < 3000; i++) {
+                vertices.push((Math.random() - 0.5) * 1000, (Math.random() - 0.5) * 1000, (Math.random() - 0.5) * 1000);
+            }
+            geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+            const material = new THREE.PointsMaterial({ color: 0xffffff, size: 1.5, transparent: true });
+            const stars = new THREE.Points(geometry, material);
+            scene.add(stars);
+        }
+        createStarField();
+
+        function createTerrain(stageData) {
+            const geometry = new THREE.BoxGeometry(100, 10, 200); 
+            const material = new THREE.MeshStandardMaterial({ color: stageData.color, roughness: 0.8 });
+            terrain = new THREE.Mesh(geometry, material);
+            terrain.position.y = -5;
+            terrain.receiveShadow = true;
+            scene.add(terrain);
+
+            const wallMat = new THREE.MeshStandardMaterial({ color: 0x222222 });
+            const w1 = new THREE.Mesh(new THREE.BoxGeometry(2, 10, 200), wallMat); w1.position.set(51, 0, 0); scene.add(w1);
+            const w2 = new THREE.Mesh(new THREE.BoxGeometry(2, 10, 200), wallMat); w2.position.set(-51, 0, 0); scene.add(w2);
+            const w3 = new THREE.Mesh(new THREE.BoxGeometry(104, 10, 2), wallMat); w3.position.set(0, 0, 101); scene.add(w3);
+            const w4 = new THREE.Mesh(new THREE.BoxGeometry(104, 10, 2), wallMat); w4.position.set(0, 0, -101); scene.add(w4);
+
+            stageData.obstacles.forEach(obs => {
+                const geo = new THREE.BoxGeometry(obs.w, obs.h, obs.d);
+                const mat = new THREE.MeshStandardMaterial({ color: stageData.color, roughness: 0.9 });
+                mat.color.multiplyScalar(0.8);
+                const mesh = new THREE.Mesh(geo, mat);
+                mesh.position.set(obs.x, obs.h/2, obs.z);
+                mesh.castShadow = true;
+                mesh.receiveShadow = true;
+                mesh.userData = { isObstacle: true, bounds: new THREE.Box3().setFromObject(mesh) };
+                scene.add(mesh);
+                terrain.children.push(mesh); 
+            });
+
+            const holeGeo = new THREE.CylinderGeometry(3, 3, 1, 32);
+            const holeMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
+            const holeMesh = new THREE.Mesh(holeGeo, holeMat);
+            holeMesh.position.set(stageData.holePos.x, 0.1, stageData.holePos.z);
+            scene.add(holeMesh);
+
+            const poleGeo = new THREE.CylinderGeometry(0.2, 0.2, 15, 8);
+            const poleMat = new THREE.MeshLambertMaterial({ color: 0xffffff });
+            const pole = new THREE.Mesh(poleGeo, poleMat);
+            pole.position.set(stageData.holePos.x, 7.5, stageData.holePos.z);
+            pole.castShadow = true;
+            scene.add(pole);
+
+            const flagGeo = new THREE.BoxGeometry(5, 3, 0.2);
+            const flagMat = new THREE.MeshLambertMaterial({ color: 0xff0000 });
+            const flag = new THREE.Mesh(flagGeo, flagMat);
+            flag.position.set(stageData.holePos.x + 2.5, 13, stageData.holePos.z);
+            flag.rotation.y = Math.PI / 2;
+            scene.add(flag);
+
+            goal = { pos: new THREE.Vector3(stageData.holePos.x, 0, stageData.holePos.z), radius: 3 };
+        }
+
+        function initStage(idx) {
+            currentStageIdx = idx;
+            const data = STAGES[idx];
+            
+            while(scene.children.length > 0){ scene.remove(scene.children[0]); }
+            scene.add(ambientLight);
+            scene.add(dirLight);
+            createStarField();
+
+            document.getElementById('planet-name').innerText = data.name;
+            document.getElementById('gravity-display').innerText = data.gravity;
+            document.getElementById('par-display').innerText = data.par;
+            shots = 0;
+            document.getElementById('shot-count').innerText = shots;
+            document.getElementById('message-area').classList.add('hidden');
+            document.getElementById('next-btn').style.display = 'none';
+
+            gravity = 9.8 * data.gravity;
+            createTerrain(data);
+
+            const ballGeo = new THREE.SphereGeometry(1, 16, 16);
+            const ballMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
+            ball = new THREE.Mesh(ballGeo, ballMat);
+            ball.position.set(data.startPos.x, 1, data.startPos.z);
+            ball.castShadow = true;
+            scene.add(ball);
+
+            aimArrow = new THREE.ArrowHelper(
+                new THREE.Vector3(0, 0, -1), 
+                ball.position, 
+                5, 
+                0xffff00
+            );
+            scene.add(aimArrow);
+
+            ballVelocity.set(0, 0, 0);
+            gameState = STATE.AIMING;
+            resetGaugeUI();
+            
+            const dirToHole = new THREE.Vector3().subVectors(goal.pos, ball.position).normalize();
+            aimAngle = Math.atan2(-dirToHole.x, -dirToHole.z);
+        }
+
+        function resetGaugeUI() {
+            document.getElementById('gauge-container-group').style.display = 'flex';
+            document.getElementById('gauge-status').innerText = "SPACE를 눌러 샷 시작";
+            document.getElementById('gauge-status').style.color = "#fbbf24";
+            
+            // Reset Horizontal
+            document.getElementById('gauge-power-fill').style.width = '0%';
+            document.getElementById('gauge-power-fill').style.opacity = '0.8';
+            gaugeCursorPos = 0;
+            document.getElementById('gauge-cursor').style.left = '0%';
+            
+            // Reset Vertical
+            document.getElementById('gauge-height-fill').style.height = '0%';
+            document.getElementById('gauge-height-fill').style.opacity = '0.8';
+            heightCursorPos = 0;
+            document.getElementById('gauge-height-cursor').style.bottom = '0%';
+
+            document.getElementById('shot-feedback').classList.add('hidden');
+        }
+
+        // --- 4. Controls & Input ---
+        const keys = { w: false, a: false, s: false, d: false, space: false };
+        let spacePressed = false; 
+
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'KeyA') keys.a = true;
+            if (e.code === 'KeyD') keys.d = true;
+            if (e.code === 'Space') {
+                if (!spacePressed) { 
+                    handleSpace();
+                    spacePressed = true;
+                }
+            }
+            if (e.code === 'KeyR') resetBall();
+        });
+
+        window.addEventListener('keyup', (e) => {
+            if (e.code === 'KeyA') keys.a = false;
+            if (e.code === 'KeyD') keys.d = false;
+            if (e.code === 'Space') spacePressed = false;
+        });
+
+        function handleSpace() {
+            // 4-Step Logic: Aim -> Power -> Height -> Curve -> Shoot
+            if (gameState === STATE.AIMING) {
+                // 1. Start Power
+                gameState = STATE.GAUGE_POWER;
+                gaugeDirection = 1;
+                gaugeCursorPos = 0;
+                document.getElementById('gauge-status').innerText = "파워 결정! (가로 왕복)";
+                document.getElementById('gauge-status').style.color = "#4ade80";
+            } 
+            else if (gameState === STATE.GAUGE_POWER) {
+                // 2. Lock Power -> Start Height
+                gameState = STATE.GAUGE_HEIGHT;
+                gaugePowerVal = gaugeCursorPos; 
+                
+                // Visual freeze power
+                document.getElementById('gauge-power-fill').style.width = gaugeCursorPos + '%';
+                document.getElementById('gauge-power-fill').style.opacity = '0.4';
+                
+                // Initialize Height Gauge
+                heightDirection = 1;
+                heightCursorPos = 0;
+
+                document.getElementById('gauge-status').innerText = "높이(탄도) 결정! (세로 왕복)";
+                document.getElementById('gauge-status').style.color = "#a855f7";
+            }
+            else if (gameState === STATE.GAUGE_HEIGHT) {
+                // 3. Lock Height -> Start Curve
+                gameState = STATE.GAUGE_CURVE;
+                gaugeHeightVal = heightCursorPos;
+                
+                // Visual freeze height
+                document.getElementById('gauge-height-fill').style.height = heightCursorPos + '%';
+                document.getElementById('gauge-height-fill').style.opacity = '0.4';
+
+                // Initialize Curve Gauge (Reuse horizontal cursor, reset or continue?)
+                // Let's reset cursor to center for curve? Or keep moving?
+                // Let's keep moving from where it was for smooth feel, or reset to 0 for clarity.
+                // Resetting to 0 makes it easier to predict.
+                gaugeCursorPos = 0; 
+                gaugeDirection = 1;
+
+                document.getElementById('gauge-status').innerText = "커브(방향) 결정!";
+                document.getElementById('gauge-status').style.color = "#fff";
+            }
+            else if (gameState === STATE.GAUGE_CURVE) {
+                // 4. Lock Curve & Shoot
+                gaugeCurveVal = (gaugeCursorPos - 50) / 50; // -1 to 1
+                
+                // Feedback
+                let feedbackText = "";
+                let feedbackColor = "";
+                
+                if (Math.abs(gaugeCurveVal) < 0.1) {
+                    feedbackText = "STRAIGHT!";
+                    feedbackColor = "text-white";
+                } else if (gaugeCurveVal < 0) {
+                    feedbackText = "HOOK!";
+                    feedbackColor = "text-red-500";
+                } else {
+                    feedbackText = "SLICE!";
+                    feedbackColor = "text-blue-500";
+                }
+                
+                showFeedback(feedbackText, feedbackColor);
+                shootBall();
+            }
+        }
+
+        function showFeedback(text, colorClass) {
+            const el = document.getElementById('shot-feedback');
+            el.innerHTML = `<h2 class="text-6xl font-black italic drop-shadow-2xl ${colorClass}" style="-webkit-text-stroke: 2px white;">${text}</h2>`;
+            el.classList.remove('hidden');
+            setTimeout(() => { el.classList.add('hidden'); }, 1500);
+        }
+
+        function shootBall() {
+            shots++;
+            document.getElementById('shot-count').innerText = shots;
+            document.getElementById('gauge-container-group').style.display = 'none';
+            
+            // --- Physics Calculation ---
+            
+            // 1. Total Speed (Power) - Increased Multiplier
+            const maxSpeed = 5.0; // Increased from 2.0 to 5.0
+            const totalSpeed = (gaugePowerVal / 100) * maxSpeed; 
+            
+            // 2. Launch Angle (Height)
+            // 0% = 10 degrees (Low runner), 100% = 60 degrees (High lob)
+            const minAngle = 10 * (Math.PI / 180);
+            const maxAngle = 60 * (Math.PI / 180);
+            const launchAngle = minAngle + (gaugeHeightVal / 100) * (maxAngle - minAngle);
+            
+            // Decompose Total Speed into Vertical(Y) and Horizontal(XZ) components
+            const velY = totalSpeed * Math.sin(launchAngle);
+            const velXZ = totalSpeed * Math.cos(launchAngle);
+
+            // 3. Direction (Aim + Curve)
+            const maxCurveAngle = 0.5; // ~30 degrees
+            const shotAngle = aimAngle + (gaugeCurveVal * maxCurveAngle);
+            
+            const dirX = -Math.sin(shotAngle);
+            const dirZ = -Math.cos(shotAngle);
+            
+            // Final Velocity Vector
+            ballVelocity.set(dirX * velXZ, velY, dirZ * velXZ); 
+            
+            gameState = STATE.MOVING;
+        }
+
+        function resetBall() {
+            if (gameState === STATE.HOLED) return;
+            ballVelocity.set(0, 0, 0);
+            ball.position.y = 1;
+            gameState = STATE.AIMING;
+            resetGaugeUI();
+        }
+
+        // --- 5. Game Loop ---
+
+        function update() {
+            // 1. Aiming
+            if (gameState === STATE.AIMING) {
+                const rotSpeed = 0.03;
+                if (keys.a) aimAngle += rotSpeed;
+                if (keys.d) aimAngle -= rotSpeed;
+
+                aimArrow.position.copy(ball.position);
+                const dir = new THREE.Vector3(-Math.sin(aimAngle), 0, -Math.cos(aimAngle));
+                aimArrow.setDirection(dir);
+            }
+
+            // 2. Horizontal Gauge Logic (Power OR Curve)
+            if (gameState === STATE.GAUGE_POWER || gameState === STATE.GAUGE_CURVE) {
+                gaugeCursorPos += gaugeSpeed * gaugeDirection;
+                if (gaugeCursorPos >= 100) { gaugeCursorPos = 100; gaugeDirection = -1; }
+                if (gaugeCursorPos <= 0) { gaugeCursorPos = 0; gaugeDirection = 1; }
+                
+                document.getElementById('gauge-cursor').style.left = gaugeCursorPos + '%';
+                
+                // Visual fill only for Power
+                if (gameState === STATE.GAUGE_POWER) {
+                    document.getElementById('gauge-power-fill').style.width = gaugeCursorPos + '%';
+                }
+            }
+
+            // 3. Vertical Gauge Logic (Height)
+            if (gameState === STATE.GAUGE_HEIGHT) {
+                heightCursorPos += gaugeSpeed * heightDirection;
+                if (heightCursorPos >= 100) { heightCursorPos = 100; heightDirection = -1; }
+                if (heightCursorPos <= 0) { heightCursorPos = 0; heightDirection = 1; }
+                
+                document.getElementById('gauge-height-cursor').style.bottom = heightCursorPos + '%';
+                document.getElementById('gauge-height-fill').style.height = heightCursorPos + '%';
+            }
+
+            // 4. Physics
+            if (gameState === STATE.MOVING) {
+                ballVelocity.y -= gravity * 0.016;
+                ball.position.add(ballVelocity.clone().multiplyScalar(0.1));
+
+                // Floor
+                if (ball.position.y <= 1) {
+                    ball.position.y = 1;
+                    ballVelocity.y *= -restitution; 
+                    ballVelocity.x *= friction;
+                    ballVelocity.z *= friction;
+                    if (Math.abs(ballVelocity.y) < 0.2) ballVelocity.y = 0;
+                }
+
+                // Bounds
+                if (ball.position.x > 50 || ball.position.x < -50) { 
+                    ballVelocity.x *= -wallRestitution; 
+                    ball.position.x = Math.sign(ball.position.x)*49.5; 
+                }
+                if (ball.position.z > 100 || ball.position.z < -100) { 
+                    ballVelocity.z *= -wallRestitution; 
+                    ball.position.z = Math.sign(ball.position.z)*99.5; 
+                }
+                
+                // Obstacles
+                terrain.children.forEach(child => {
+                    if (child.userData.isObstacle) {
+                        const bounds = child.userData.bounds;
+                        const dx = Math.abs(ball.position.x - child.position.x);
+                        const dz = Math.abs(ball.position.z - child.position.z);
+                        const geometry = child.geometry;
+                        const hw = geometry.parameters.width / 2;
+                        const hd = geometry.parameters.depth / 2;
+                        
+                        if (dx < hw + 1 && dz < hd + 1 && ball.position.y < geometry.parameters.height) {
+                            if (dx / hw > dz / hd) { 
+                                ballVelocity.x *= -wallRestitution; 
+                                ball.position.x += Math.sign(ball.position.x - child.position.x) * 0.5; 
+                            } else { 
+                                ballVelocity.z *= -wallRestitution; 
+                                ball.position.z += Math.sign(ball.position.z - child.position.z) * 0.5; 
+                            }
+                        }
+                    }
+                });
+
+                if (ballVelocity.length() < 0.05 && ball.position.y === 1) {
+                    ballVelocity.set(0, 0, 0);
+                    checkHoleIn();
+                }
+            }
+
+            // Camera
+            const cx = ball.position.x - Math.sin(aimAngle) * -cameraDistance;
+            const cz = ball.position.z - Math.cos(aimAngle) * -cameraDistance;
+            camera.position.lerp(new THREE.Vector3(cx, ball.position.y + cameraHeight, cz), 0.1);
+            camera.lookAt(ball.position);
+        }
+
+        function checkHoleIn() {
+            const dist = ball.position.distanceTo(goal.pos);
+            if (dist < goal.radius) {
+                gameState = STATE.HOLED;
+                document.getElementById('message-title').innerText = "HOLE IN!";
+                document.getElementById('message-desc').innerText = `${shots} 샷 (PAR ${STAGES[currentStageIdx].par})`;
+                document.getElementById('message-area').classList.remove('hidden');
+                
+                if (currentStageIdx < STAGES.length - 1) {
+                    document.getElementById('next-btn').style.display = 'inline-block';
+                    document.getElementById('next-btn').onclick = () => initStage(currentStageIdx + 1);
+                } else {
+                    document.getElementById('next-btn').innerText = "처음부터";
+                    document.getElementById('next-btn').onclick = () => initStage(0);
+                    document.getElementById('next-btn').style.display = 'inline-block';
+                }
+            } else {
+                gameState = STATE.AIMING;
+                resetGaugeUI();
+            }
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            update();
+            renderer.render(scene, camera);
+        }
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+        
+        initStage(0);
+        animate();
+
+    </script>
+</body>
+</html>
