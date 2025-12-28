@@ -2,18 +2,17 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>리얼 우주 중력 골프 v1.1.2 (Multi Fix)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>리얼 우주 중력 골프 v1.2.0 (Legends)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@500;700&display=swap" rel="stylesheet">
     <style>
-        body { margin: 0; overflow: hidden; background-color: #020617; font-family: 'Rajdhani', sans-serif; touch-action: none; user-select: none; }
+        body { margin: 0; overflow: hidden; background-color: #020617; font-family: 'Rajdhani', sans-serif; touch-action: none; user-select: none; -webkit-touch-callout: none; }
         .font-sci { font-family: 'Orbitron', sans-serif; }
         .hidden { display: none !important; }
-        
-        * { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+        * { -webkit-user-select: none; user-select: none; }
 
         .fade-in { animation: fadeIn 0.4s ease-out forwards; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
@@ -27,7 +26,7 @@
         .btn-menu:hover { border-color: rgba(56, 189, 248, 0.6); transform: translateY(-2px); }
         .btn-menu:active { transform: scale(0.98); }
 
-        /* UI Elements */
+        /* Gauge UI */
         #gauge-container-group { 
             position: absolute; bottom: 130px; left: 50%; transform: translateX(-50%); 
             display: none; gap: 10px; z-index: 50; align-items: flex-end; 
@@ -77,13 +76,25 @@
         .vs-score-row { display: flex; justify-content: space-between; margin-bottom: 5px; padding: 5px; background: rgba(0,0,0,0.3); border-radius: 5px; }
         .vs-score-me { color: #4ade80; font-weight: bold; }
         .vs-score-op { color: #f87171; font-weight: bold; }
+        
+        .shake-screen { animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both; }
+        @keyframes shake { 10%, 90% { transform: translate3d(-1px, 0, 0); } 20%, 80% { transform: translate3d(2px, 0, 0); } 30%, 50%, 70% { transform: translate3d(-4px, 0, 0); } 40%, 60% { transform: translate3d(4px, 0, 0); } }
+
+        /* Leaderboard Style */
+        .lb-row { display: flex; justify-content: space-between; padding: 10px; border-bottom: 1px solid #334155; font-size: 14px; }
+        .lb-row:last-child { border-bottom: none; }
+        .lb-rank { width: 30px; font-weight: bold; color: #94a3b8; }
+        .lb-name { flex: 1; text-align: left; padding-left: 10px; color: white; }
+        .lb-tier { width: 80px; text-align: center; font-size: 10px; }
+        .lb-lp { width: 60px; text-align: right; font-family: monospace; color: #facc15; }
+        .lb-row.my-rank { background: rgba(59, 130, 246, 0.2); border: 1px solid #3b82f6; border-radius: 8px; margin-top: 5px; }
     </style>
 </head>
 <body class="text-white select-none" oncontextmenu="return false;">
 
     <div id="loader">
         <div class="spinner"></div>
-        <p class="font-sci tracking-widest text-blue-400 text-sm">UPDATING GALAXY v1.1.2</p>
+        <p class="font-sci tracking-widest text-blue-400 text-sm">LOADING LEGENDS v1.2.0</p>
     </div>
 
     <div id="multi-status">🟢 ONLINE</div>
@@ -92,16 +103,25 @@
 
     <!-- 1. Lobby -->
     <div id="lobby-screen" class="absolute inset-0 z-50 flex flex-col items-center justify-center bg-slate-950/95 backdrop-blur-md fade-in hidden">
-        <div class="text-center mb-8 relative">
+        <div class="text-center mb-6 relative w-full max-w-md">
             <h1 class="relative text-5xl md:text-7xl font-black text-transparent bg-clip-text bg-gradient-to-br from-indigo-400 to-purple-600 font-sci mb-2 tracking-tighter drop-shadow-lg">
                 GRAVITY<span class="text-white">GOLF</span>
             </h1>
-            <p class="text-slate-500 text-xs md:text-sm font-sci tracking-[0.5em] opacity-80">UNIVERSE LEAGUE v1.1.2</p>
+            <p class="text-slate-500 text-xs md:text-sm font-sci tracking-[0.5em] opacity-80">UNIVERSE LEAGUE v1.2.0</p>
             
-            <div id="my-rank-info" class="mt-4 bg-slate-800/50 px-4 py-2 rounded-full border border-slate-700 inline-flex items-center gap-2">
-                <span class="text-xs text-slate-400">MY RANK:</span>
-                <span id="lobby-rank-name" class="font-bold font-sci text-yellow-400">UNRANKED</span>
-                <span id="lobby-rank-lp" class="text-xs font-mono text-slate-300">0 LP</span>
+            <!-- My Rank Info -->
+            <div id="my-rank-info" class="mt-4 bg-slate-800/80 px-6 py-3 rounded-2xl border border-slate-700 flex justify-between items-center shadow-lg cursor-pointer hover:border-blue-500 transition" onclick="GameApp.changeName()">
+                <div class="text-left">
+                    <div class="text-[10px] text-slate-400">PLAYER</div>
+                    <div id="lobby-player-name" class="font-bold text-white text-lg">GUEST</div>
+                </div>
+                <div class="text-right">
+                    <div class="text-[10px] text-slate-400">RANKING</div>
+                    <div>
+                        <span id="lobby-rank-name" class="font-bold font-sci text-yellow-400 mr-2">UNRANKED</span>
+                        <span id="lobby-rank-lp" class="text-xs font-mono text-slate-300">0 LP</span>
+                    </div>
+                </div>
             </div>
         </div>
         
@@ -124,10 +144,12 @@
                     <div class="text-left"><h3 class="text-xl font-bold font-sci text-blue-400">MULTIPLAYER</h3><p class="text-xs text-slate-400">Ranked & Friend</p></div>
                 </div>
             </div>
-            <div class="btn-menu rounded-2xl p-6 group border-l-4 border-red-500" onclick="GameApp.selectMode('ONESHOT')">
+            
+            <!-- Leaderboard Button -->
+            <div class="btn-menu rounded-2xl p-6 group border-l-4 border-purple-500" onclick="GameApp.openLeaderboard()">
                 <div class="flex items-center gap-4">
-                    <div class="text-3xl grayscale group-hover:grayscale-0 transition">🎯</div>
-                    <div class="text-left"><h3 class="text-xl font-bold font-sci text-red-400">ONE SHOT</h3><p class="text-xs text-slate-400">Hardcore</p></div>
+                    <div class="text-3xl grayscale group-hover:grayscale-0 transition">👑</div>
+                    <div class="text-left"><h3 class="text-xl font-bold font-sci text-purple-400">LEADERBOARD</h3><p class="text-xs text-slate-400">Hall of Fame</p></div>
                 </div>
             </div>
         </div>
@@ -135,6 +157,29 @@
 
     <!-- Modal -->
     <div id="common-modal" class="hidden">
+        
+        <!-- Name Input -->
+        <div id="name-input-modal" class="modal-content hidden">
+            <h2 class="text-2xl font-bold font-sci mb-4 text-white">PROFILE SETUP</h2>
+            <p class="text-xs text-slate-400 mb-4">Enter your pilot name</p>
+            <input type="text" id="player-name-input" maxlength="10" class="w-full bg-black/50 border border-slate-600 p-3 text-center text-xl font-sci text-white rounded-lg mb-4 focus:border-blue-500 outline-none uppercase" placeholder="NAME">
+            <button onclick="GameApp.saveName()" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-lg">CONFIRM</button>
+        </div>
+
+        <!-- Leaderboard -->
+        <div id="leaderboard-modal" class="modal-content hidden max-w-lg">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-bold font-sci text-purple-400">TOP RANKERS</h2>
+                <div class="text-[10px] text-slate-500 bg-slate-800 px-2 py-1 rounded">SEASON 1</div>
+            </div>
+            
+            <div class="bg-black/30 rounded-xl overflow-hidden mb-4 max-h-[350px] overflow-y-auto" id="lb-list">
+                <!-- JS Populated -->
+            </div>
+            
+            <button onclick="GameApp.closeModal()" class="w-full bg-slate-700 hover:bg-slate-600 text-white font-bold py-3 rounded-lg">CLOSE</button>
+        </div>
+
         <div id="multi-select" class="modal-content hidden">
             <h2 class="text-2xl font-bold font-sci mb-6 text-blue-400">BATTLE MODE</h2>
             <button onclick="GameApp.startMatching()" class="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold py-4 rounded-xl mb-4 border border-blue-400 shadow-[0_0_20px_rgba(59,130,246,0.3)] group relative overflow-hidden">
@@ -216,10 +261,6 @@
             </div>
         </div>
 
-        <button onclick="ThreeScene.resetBall()" class="absolute top-6 left-1/2 transform -translate-x-1/2 pointer-events-auto bg-white/10 hover:bg-white/20 p-2 px-5 rounded-full text-[10px] font-bold border border-white/20 backdrop-blur-md transition z-50">
-            ↺ RESPAWN
-        </button>
-
         <!-- Gauge UI -->
         <div id="gauge-container-group" class="pointer-events-auto">
             <div id="gauge-height-wrapper"><div id="gauge-height-fill"></div><div id="gauge-height-cursor"></div></div>
@@ -280,18 +321,52 @@
         })();
         setTimeout(()=>{const l=document.getElementById('loader');if(l&&!l.classList.contains('hidden')){l.classList.add('hidden');document.getElementById('lobby-screen').classList.remove('hidden');}}, 3000);
 
-        // --- 1. Rank & DB ---
+        // --- 1. Rank & Data Persistence System (Updated) ---
         const RankSys = (() => {
-            let lp = parseInt(localStorage.getItem('rgg_lp') || '1000');
-            const tiers = [{n:"BRONZE",min:0},{n:"SILVER",min:1200},{n:"GOLD",min:1500},{n:"PLATINUM",min:1900},{n:"GALAXY",min:2400}];
+            // Load Full Data or Default
+            const loadData = () => {
+                const d = localStorage.getItem('rgg_save_v1');
+                return d ? JSON.parse(d) : { name: '', lp: 1000, wins: 0, matches: 0 };
+            };
+            const saveData = (data) => localStorage.setItem('rgg_save_v1', JSON.stringify(data));
+            
+            const tiers = [{n:"BRONZE",min:0,c:"#92400e"},{n:"SILVER",min:1200,c:"#475569"},{n:"GOLD",min:1500,c:"#ca8a04"},{n:"PLATINUM",min:1900,c:"#0891b2"},{n:"GALAXY",min:2400,c:"#7c3aed"}];
+            
             return {
-                get: () => { let t=tiers[0]; for(let i=tiers.length-1;i>=0;i--){if(lp>=tiers[i].min){t=tiers[i];break;}} return {...t,lp:lp}; },
-                update: (res) => { const d=res===1?25:(res===0?5:-15); lp=Math.max(0,lp+d); localStorage.setItem('rgg_lp',lp); return d; },
-                getBotName: () => ["Cosmo","Nova","Star","Void","Nebula"][Math.floor(Math.random()*5)]+Math.floor(Math.random()*100),
-                simulateBotScore: (par) => Math.max(1, par + Math.floor(Math.random()*4)-1 - Math.floor(Math.min(1.5, lp/2000)))
+                getData: () => loadData(),
+                setName: (n) => { const d = loadData(); d.name = n; saveData(d); },
+                getTier: (lp) => { let t=tiers[0]; for(let i=tiers.length-1;i>=0;i--){if(lp>=tiers[i].min){t=tiers[i];break;}} return t; },
+                updateMatch: (result) => { 
+                    const d = loadData();
+                    const diff = result === 1 ? 25 : (result === 0 ? 5 : -15);
+                    d.lp = Math.max(0, d.lp + diff);
+                    d.matches++;
+                    if(result === 1) d.wins++;
+                    saveData(d);
+                    return diff;
+                },
+                getBotName: () => ["Cosmo","Nova","Star","Void","Nebula","Comet"][Math.floor(Math.random()*6)]+Math.floor(Math.random()*100),
+                simulateBotScore: (par, rank) => Math.max(1, par + Math.floor(Math.random()*4)-1 - Math.floor(Math.min(1.5, rank/2000))),
+                // Generate Mock Leaderboard mixed with player
+                getLeaderboard: () => {
+                    const d = loadData();
+                    const bots = [
+                        {name: "HyperNova", lp: 3200, t:"GALAXY"}, {name: "StarLord", lp: 2950, t:"GALAXY"},
+                        {name: "GravityKing", lp: 2500, t:"GALAXY"}, {name: "SpaceX", lp: 2100, t:"PLATINUM"},
+                        {name: "MoonWalker", lp: 1800, t:"GOLD"}, {name: "Earthling", lp: 1300, t:"SILVER"},
+                        {name: "Newbie", lp: 900, t:"BRONZE"}
+                    ];
+                    const player = { name: d.name || "PLAYER", lp: d.lp, t: tiers[0].n, isMe: true };
+                    // Determine player tier
+                    for(let i=tiers.length-1;i>=0;i--){if(d.lp>=tiers[i].min){player.t=tiers[i].n;break;}}
+                    
+                    const list = [...bots, player].sort((a,b) => b.lp - a.lp);
+                    return list.slice(0, 50); // Top 50
+                }
             };
         })();
 
+        // --- 2. Planet DB ---
         const PlanetDB = (() => {
             const colors = { EARTH: 0x4ade80, MARS: 0xc2410c, MOON: 0x94a3b8, ICE: 0xbfdbfe, LAVA: 0x7f1d1d, GAS: 0xd97706 };
             const realData = [ {n:"Mercury",g:0.38,c:colors.MOON}, {n:"Venus",g:0.90,c:colors.LAVA}, {n:"Earth",g:1.00,c:colors.EARTH}, {n:"Mars",g:0.38,c:colors.MARS}, {n:"Jupiter",g:2.53,c:colors.GAS} ];
@@ -312,14 +387,49 @@
         window.GameApp = {
             state: 'LOBBY', mode: 'TOUR', currentStage: null, 
             peer: null, conn: null, myId: null, isHost: false, myTurn: true, 
-            scoreMe: 0, scoreOp: 0, startTime: 0, timerInterval: null, isRanked: false,
+            scoreMe: 0, scoreOp: 0, startTime: 0, timerInterval: null, isRanked: false, opFinished: false,
 
-            init() { try{ThreeScene.init();}catch(e){} this.updateLobbyRank(); this.updateUI(); this.setupTouchControls(); document.getElementById('loader').classList.add('hidden'); },
-            updateLobbyRank() { const r=RankSys.get(); document.getElementById('lobby-rank-name').innerText=r.n; document.getElementById('lobby-rank-lp').innerText=`${r.lp} LP`; },
-            setupTouchControls() { /* ...omitted for brevity, same as before... */ const s=document.getElementById('btn-shot-mob'); if(s)s.addEventListener('touchstart',e=>{e.preventDefault();ThreeScene.triggerSpace();}); },
+            init() { 
+                try{ThreeScene.init();}catch(e){} 
+                this.checkName();
+                this.updateLobbyRank(); this.updateUI(); this.setupTouchControls(); document.getElementById('loader').classList.add('hidden'); 
+            },
+            
+            checkName() {
+                const d = RankSys.getData();
+                if(!d.name) {
+                    document.getElementById('common-modal').classList.remove('hidden');
+                    document.getElementById('common-modal').style.display='flex';
+                    this.switchModal('name-input-modal');
+                }
+            },
+            saveName() {
+                const n = document.getElementById('player-name-input').value.trim().toUpperCase();
+                if(n.length < 1) return alert("Enter Name");
+                RankSys.setName(n);
+                this.closeModal();
+                this.updateLobbyRank();
+            },
+            changeName() {
+                document.getElementById('common-modal').classList.remove('hidden');
+                document.getElementById('common-modal').style.display='flex';
+                this.switchModal('name-input-modal');
+            },
+
+            updateLobbyRank() { 
+                const d = RankSys.getData();
+                const t = RankSys.getTier(d.lp);
+                document.getElementById('lobby-player-name').innerText = d.name || "GUEST";
+                document.getElementById('lobby-rank-name').innerText = t.n; 
+                document.getElementById('lobby-rank-lp').innerText = `${d.lp} LP`; 
+                // Color mapping could be added here
+            },
+            setupTouchControls() { const s=document.getElementById('btn-shot-mob'); if(s)s.addEventListener('touchstart',e=>{e.preventDefault();ThreeScene.triggerSpace();}); },
 
             updateUI() {
-                ['lobby-screen','in-game-ui','result-screen','common-modal'].forEach(id=>document.getElementById(id).classList.add('hidden'));
+                ['lobby-screen','in-game-ui','result-screen','common-modal'].forEach(id=>{
+                    const el=document.getElementById(id); if(el){el.classList.add('hidden');el.style.display='none';}
+                });
                 if(this.state==='LOBBY'){document.getElementById('lobby-screen').classList.remove('hidden');document.getElementById('lobby-screen').style.display='flex';this.updateLobbyRank();}
                 else if(this.state==='IN_GAME'){
                     document.getElementById('in-game-ui').classList.remove('hidden');document.getElementById('in-game-ui').style.display='block';
@@ -329,8 +439,24 @@
 
             selectMode(m) { this.mode=m; this.myTurn=true; this.isRanked=false; this.startGame(PlanetDB.getRandom()); },
             showMultiOptions() { document.getElementById('common-modal').classList.remove('hidden'); document.getElementById('common-modal').style.display='flex'; this.switchModal('multi-select'); },
-            switchModal(id) { ['multi-select','p2p-options','p2p-host','p2p-join','matching-wait'].forEach(d=>document.getElementById(d).classList.add('hidden')); document.getElementById(id).classList.remove('hidden'); },
+            switchModal(id) { ['multi-select','p2p-options','p2p-host','p2p-join','matching-wait','name-input-modal','leaderboard-modal'].forEach(d=>document.getElementById(d).classList.add('hidden')); document.getElementById(id).classList.remove('hidden'); },
             closeModal() { document.getElementById('common-modal').style.display='none'; },
+            
+            // Leaderboard
+            openLeaderboard() {
+                document.getElementById('common-modal').classList.remove('hidden');
+                document.getElementById('common-modal').style.display='flex';
+                this.switchModal('leaderboard-modal');
+                const list = document.getElementById('lb-list');
+                list.innerHTML = '';
+                const data = RankSys.getLeaderboard();
+                data.forEach((p, i) => {
+                    const div = document.createElement('div');
+                    div.className = `lb-row ${p.isMe ? 'my-rank' : ''}`;
+                    div.innerHTML = `<span class="lb-rank">${i+1}</span><span class="lb-name">${p.name}</span><span class="lb-tier text-${p.t==='GALAXY'?'purple':(p.t==='GOLD'?'yellow':'slate')}-400">${p.t}</span><span class="lb-lp">${p.lp}</span>`;
+                    list.appendChild(div);
+                });
+            },
 
             // Matching
             startMatching() {
@@ -338,10 +464,15 @@
                 document.getElementById('match-status-text').innerText = "Searching...";
                 document.getElementById('match-found').classList.add('hidden');
                 setTimeout(() => {
-                    const bn = RankSys.getBotName(); const br = RankSys.get();
+                    const bn = RankSys.getBotName();
+                    // Match somewhat close rank
+                    const myData = RankSys.getData();
+                    const botLP = Math.floor(myData.lp * (0.9 + Math.random()*0.2));
+                    const botTier = RankSys.getTier(botLP);
+                    
                     document.getElementById('match-status-text').innerText = "Found!";
                     document.getElementById('match-found').classList.remove('hidden');
-                    document.getElementById('op-name').innerText = bn; document.getElementById('op-rank').innerText = br.n;
+                    document.getElementById('op-name').innerText = bn; document.getElementById('op-rank').innerText = `${botTier.n} (${botLP})`;
                     setTimeout(() => { this.startBotMatch(true); }, 2000);
                 }, 1500+Math.random()*2000);
             },
@@ -364,9 +495,9 @@
                     if(d.type==='TURN_END'){
                         this.myTurn=true; this.showTurnNotification("YOUR TURN"); 
                         document.getElementById('score-op').innerText=d.score; 
-                        ThreeScene.startTurn(); // Fix 1: Restore Gauge
+                        ThreeScene.startTurn();
                     }
-                    if(d.type==='HOLE_IN'){this.scoreOp=d.score;document.getElementById('score-op').innerText=d.score;if(this.state==='RESULT')this.finishStage(this.scoreMe,"MATCH OVER");}
+                    if(d.type==='HOLE_IN'){this.scoreOp=d.score; this.opFinished=true; document.getElementById('score-op').innerText=d.score; if(this.state==='IN_GAME')this.finishStage(this.scoreMe,"DEFEAT");}
                 });
             },
             sendPosUpdate(pos) { if(this.conn&&this.conn.open)this.conn.send({type:'POS_UPDATE',pos:pos}); },
@@ -380,29 +511,33 @@
                 this.scoreOp=0; this.myTurn=true;
             },
             handleBotTurn() {
-                // Fix 2: AI Logic
-                if(this.mode==='MULTI' && !this.conn && !this.myTurn) {
-                    setTimeout(() => {
-                        this.scoreOp++; document.getElementById('score-op').innerText=this.scoreOp;
-                        // Determine if bot holes out based on par proximity
-                        const par = this.currentStage.par;
-                        // Bot skill increases with rank
-                        const chance = (this.isRanked && RankSys.get().n!=='BRONZE') ? 0.6 : 0.3; 
-                        
-                        // If score is near par, bot might finish or continue
-                        if(this.scoreOp >= par && Math.random() < chance) {
-                            // Bot finishes hole logic would go here, for now just pass turn back to simulate play
-                            this.myTurn=true; this.showTurnNotification("YOUR TURN"); ThreeScene.startTurn();
-                        } else {
-                            this.myTurn=true; this.showTurnNotification("YOUR TURN"); ThreeScene.startTurn();
-                        }
-                    }, 1500);
+                if(this.mode==='MULTI' && !this.conn && !this.myTurn && !this.opFinished) {
+                    ThreeScene.shootBot(); // AI Action
+                }
+            },
+            botTurnFinished() {
+                this.scoreOp++; 
+                const el = document.getElementById('score-op'); if(el) el.innerText = this.scoreOp;
+                if(!this.opFinished) {
+                    this.myTurn = true; 
+                    this.showTurnNotification("YOUR TURN"); 
+                    ThreeScene.startTurn();
+                }
+            },
+            handleBotHoleIn() {
+                this.opFinished = true;
+                this.scoreOp++;
+                const el = document.getElementById('score-op'); if(el) el.innerText = this.scoreOp;
+                if(this.state === 'IN_GAME') {
+                    this.finishStage(this.scoreMe, "DEFEAT");
                 }
             },
             showTurnNotification(t) { const e=document.getElementById('turn-notification');e.innerText=t;e.classList.add('show-turn');setTimeout(()=>e.classList.remove('show-turn'),2000); },
 
             startGame(d) {
                 this.state='IN_GAME'; this.currentStage=d; this.updateUI(); this.startTime=Date.now();
+                this.opFinished = false; this.scoreMe = 0; this.scoreOp = 0;
+                
                 document.getElementById('hud-planet-name').innerText=d.name; document.getElementById('hud-planet-info').innerText=`G:${d.gravity}`;
                 const tp=document.getElementById('timer-panel');
                 if(this.mode==='SPEED'){ this.timeEnergy=120000; tp.classList.remove('hidden'); } else { tp.classList.add('hidden'); }
@@ -411,7 +546,8 @@
                     if(this.mode==='SPEED'){this.timeEnergy-=100;if(this.timeEnergy<=0){this.finishStage(99,"ENERGY DEPLETED");return;} document.getElementById('hud-timer').innerText=`${Math.ceil(this.timeEnergy/1000)}s`;}
                 },100);
                 if(this.mode==='MULTI'){
-                    document.getElementById('scoreboard').classList.remove('hidden'); document.getElementById('score-me').innerText=0; document.getElementById('score-op').innerText=0;
+                    document.getElementById('scoreboard').classList.remove('hidden'); 
+                    document.getElementById('score-me').innerText=0; document.getElementById('score-op').innerText=0;
                     if(this.myTurn)this.showTurnNotification("YOUR TURN"); else this.showTurnNotification("OPPONENT TURN");
                 } else { document.getElementById('scoreboard').classList.add('hidden'); this.myTurn=true; }
                 ThreeScene.initStage(d);
@@ -419,23 +555,34 @@
 
             finishStage(s, t="MISSION CLEAR") {
                 clearInterval(this.timerInterval); this.state='RESULT'; this.updateUI();
-                this.scoreMe=s; document.getElementById('res-title').innerText=t; document.getElementById('res-score').innerText=s;
-                document.getElementById('final-me').innerText=s;
+                this.scoreMe=s; 
+                
+                const titleEl = document.getElementById('res-title'); if(titleEl) titleEl.innerText=t;
+                const scoreEl = document.getElementById('res-score'); if(scoreEl) scoreEl.innerText=s;
+                
+                // Safe check for final-me which might not exist if UI changed, use res-score
+                const finalMe = document.getElementById('final-me'); if(finalMe) finalMe.innerText=s;
+                
                 const rr=document.getElementById('rank-result');
                 if(this.isRanked) {
-                    rr.classList.remove('hidden'); document.getElementById('final-op-row').style.display='flex';
-                    if(!this.conn) this.scoreOp = RankSys.simulateBotScore(this.currentStage.par);
-                    document.getElementById('final-op').innerText=this.scoreOp;
-                    let res=0; if(s<this.scoreOp)res=1; else if(s>this.scoreOp)res=-1;
-                    const diff=RankSys.update(res);
-                    document.getElementById('lp-change').innerText=(diff>0?"+":"")+diff+" LP";
-                    document.getElementById('rank-name-new').innerText=res===1?"VICTORY":(res===0?"DRAW":"DEFEAT");
+                    rr.classList.remove('hidden'); 
+                    const opRow = document.getElementById('final-op-row'); if(opRow) opRow.style.display='flex';
+                    const finalOp = document.getElementById('final-op'); if(finalOp) finalOp.innerText=this.scoreOp;
+                    
+                    let matchRes = 0;
+                    if(t === "VICTORY" || t === "MISSION CLEAR") matchRes = 1;
+                    else if(t === "DEFEAT" || t === "MATCH OVER") matchRes = -1;
+                    
+                    const diff=RankSys.updateMatch(matchRes);
+                    const lpChg = document.getElementById('lp-change'); if(lpChg) { lpChg.innerText=(diff>0?"+":"")+diff+" LP"; lpChg.style.color=diff>0?"#4ade80":"#ef4444"; }
+                    const rnkNew = document.getElementById('rank-name-new'); if(rnkNew) { rnkNew.innerText=matchRes===1?"VICTORY":"DEFEAT"; rnkNew.style.color=matchRes===1?"#facc15":"#94a3b8"; }
                 } else {
                     rr.classList.add('hidden');
-                    document.getElementById('final-op-row').style.display=(this.mode==='MULTI')?'flex':'none';
-                    if(this.mode==='MULTI')document.getElementById('final-op').innerText=this.scoreOp;
+                    const opRow = document.getElementById('final-op-row'); if(opRow) opRow.style.display=(this.mode==='MULTI')?'flex':'none';
+                    const finalOp = document.getElementById('final-op'); if(finalOp && this.mode==='MULTI') finalOp.innerText=this.scoreOp;
                 }
-                SoundMgr.holeIn();
+                
+                if(t !== "DEFEAT") SoundMgr.holeIn();
                 if(this.mode==='MULTI' && this.conn) this.sendHoleIn(s);
             },
 
@@ -447,11 +594,12 @@
             returnToLobby() { this.state='LOBBY'; this.updateUI(); }
         };
 
-        // --- 3. Three.js ---
+        // --- 3. Three.js Scene ---
         const ThreeScene = (() => {
             let scene,camera,renderer,ball,terrainMesh,gridHelper,trailMesh,ghostBall;
             let gaugeState=0,gaugeVals={p:0,h:0,c:0},gaugeAnim={pos:0,dir:1};
             let physics={vel:new THREE.Vector3(),moving:false};
+            let botPhysics={vel:new THREE.Vector3(),moving:false};
             let stageData,aimAngle=0,orbitAngle=0,shots=0,isPutting=false;
             let miniCtx,minimapBg,keys={a:false,d:false},pathLut=[],trailPts=[],windVector=new THREE.Vector3();
 
@@ -471,6 +619,8 @@
 
             function initStage(d) {
                 if(!scene)init(); stageData=d; shots=0; physics.vel.set(0,0,0); physics.moving=false; gaugeState=0;
+                botPhysics.moving=false;
+                
                 const ws=Math.random()*8; const wd=Math.random()*Math.PI*2; windVector.set(Math.sin(wd)*ws,0,Math.cos(wd)*ws);
                 document.getElementById('wind-text').innerText=`${ws.toFixed(1)}m`;
                 document.getElementById('hud-shots').innerText=0;
@@ -525,6 +675,36 @@
                     if(ghostBall) {
                         const dist=60; const ct=new THREE.Vector3(ghostBall.position.x-Math.sin(orbitAngle)*-dist,ghostBall.position.y+30,ghostBall.position.z-Math.cos(orbitAngle)*-dist);
                         camera.position.lerp(ct,0.1); camera.lookAt(ghostBall.position);
+                        
+                        // Bot Physics Simulation
+                        if(botPhysics.moving) {
+                            const dt=0.016, steps=4, sDt=dt/steps;
+                            for(let s=0; s<steps; s++) {
+                                botPhysics.vel.y -= (9.8*stageData.gravity)*sDt;
+                                let np=ghostBall.position.clone().add(botPhysics.vel.clone().multiplyScalar(sDt*20.0));
+                                const gy=getTerrainHeight(np.x,np.z);
+                                if(np.y<=gy+2){
+                                    np.y=gy+2; const n=getTerrainNormal(np.x,np.z);
+                                    if(botPhysics.vel.y<0){ const d=botPhysics.vel.dot(n); botPhysics.vel.add(n.clone().multiplyScalar(-2*d).multiplyScalar(0.6)); }
+                                    botPhysics.vel.multiplyScalar(0.98);
+                                    if(botPhysics.vel.length()<2 && Math.abs(ghostBall.position.y-(gy+2))<1){
+                                        botPhysics.vel.set(0,0,0); botPhysics.moving=false; 
+                                        GameApp.botTurnFinished(); break;
+                                    }
+                                }
+                                
+                                // BOT HOLE IN CHECK
+                                const dHole = np.distanceTo(new THREE.Vector3(stageData.holePos.x, np.y, stageData.holePos.z));
+                                if(dHole < 3.0) {
+                                    botPhysics.vel.add(new THREE.Vector3().subVectors(new THREE.Vector3(stageData.holePos.x, np.y, stageData.holePos.z), np).normalize().multiplyScalar(2*sDt));
+                                    if(dHole < 1.0) {
+                                        botPhysics.vel.set(0,0,0); botPhysics.moving=false;
+                                        GameApp.handleBotHoleIn(); break;
+                                    }
+                                }
+                                ghostBall.position.copy(np);
+                            }
+                        }
                     }
                 } else {
                     if(!physics.moving){ if(keys.a)aimAngle+=0.04; if(keys.d)aimAngle-=0.04; }
@@ -562,7 +742,7 @@
                         const dh=np.distanceTo(new THREE.Vector3(stageData.holePos.x,np.y,stageData.holePos.z));
                         if(dh<3.0){
                             physics.vel.add(new THREE.Vector3().subVectors(new THREE.Vector3(stageData.holePos.x,np.y,stageData.holePos.z),np).normalize().multiplyScalar(2*sDt));
-                            if(dh<1.0 && physics.vel.length()<30){ physics.vel.set(0,0,0); physics.moving=false; GameApp.finishStage(shots); break; }
+                            if(dh<1.0 && physics.vel.length()<30){ physics.vel.set(0,0,0); physics.moving=false; GameApp.finishStage(shots, "VICTORY"); break; }
                         }
                         ball.position.copy(np);
                         if(s===0) updateTrail(ball.position);
@@ -617,6 +797,17 @@
                 }
                 physics.moving=true; orbitAngle=aimAngle;
             }
+            
+            function shootBot() {
+                if(!ghostBall || !stageData) return;
+                const dir = new THREE.Vector3().subVectors(stageData.holePos, ghostBall.position).normalize();
+                const dist = ghostBall.position.distanceTo(new THREE.Vector3(stageData.holePos.x, ghostBall.position.y, stageData.holePos.z));
+                let p = Math.min(80, Math.sqrt(dist * 9.8 * stageData.gravity * 2.5) * 0.12);
+                p *= (0.95 + Math.random()*0.1); 
+                botPhysics.vel.set(dir.x*p, p*0.4, dir.z*p);
+                botPhysics.moving = true;
+                SoundMgr.shot();
+            }
 
             function resetBall(){
                 if(!stageData)return; physics.vel.set(0,0,0); physics.moving=false;
@@ -642,7 +833,7 @@
                 document.getElementById('gauge-power-fill').style.width='0%'; document.getElementById('gauge-height-fill').style.height='0%'; gaugeState=0;
             }
 
-            function startTurn() { updatePuttingState(); } // EXPOSED METHOD
+            function startTurn() { updatePuttingState(); }
 
             function drawMinimap() {
                 if(!miniCtx||!stageData)return; miniCtx.fillStyle='#000'; miniCtx.fillRect(0,0,300,300);
@@ -666,7 +857,7 @@
             }
 
             function setKey(k,v) { keys[k]=v; }
-            return {init,initStage,resetBall,setKey,triggerSpace,updateGhostBall,startTurn};
+            return {init,initStage,resetBall,setKey,triggerSpace,updateGhostBall,startTurn,shootBot};
         })();
 
         Object.freeze(PlanetDB);
