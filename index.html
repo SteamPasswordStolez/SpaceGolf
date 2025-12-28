@@ -3,10 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>리얼 우주 중력 골프 v0.1.4 (P2P Multi)</title>
+    <title>리얼 우주 중력 골프 v0.1.10 (Real Universe)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <!-- PeerJS for P2P -->
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Noto+Sans+KR:wght@300;500;700&display=swap" rel="stylesheet">
     <style>
@@ -22,31 +21,43 @@
             backdrop-filter: blur(12px);
             transition: all 0.2s;
             box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            cursor: pointer;
+            touch-action: manipulation;
         }
         .btn-menu:active { transform: scale(0.96); background: rgba(59, 130, 246, 0.8); }
 
-        /* UI 요소들 (게이지, 미니맵 등) */
-        #gauge-container-group { position: absolute; bottom: 120px; left: 50%; transform: translateX(-50%); display: none; gap: 15px; z-index: 50; align-items: flex-end; width: 90%; max-width: 500px; justify-content: center; background: rgba(0,0,0,0.7); padding: 15px; border-radius: 20px; border: 1px solid #555; }
+        /* UI */
+        #gauge-container-group { 
+            position: absolute; bottom: 120px; left: 50%; transform: translateX(-50%); 
+            display: none; gap: 15px; z-index: 50; align-items: flex-end; 
+            width: 90%; max-width: 500px; justify-content: center;
+            background: rgba(0,0,0,0.7); padding: 15px; border-radius: 20px; border: 1px solid #555;
+        }
         #gauge-height-wrapper { width: 36px; height: 140px; background: #111; border: 2px solid #888; border-radius: 8px; position: relative; overflow: hidden; flex-shrink: 0; }
         #gauge-height-fill { width: 100%; height: 0%; bottom: 0; position: absolute; background: linear-gradient(to top, #2563eb, #a855f7); transition: height 0.05s linear; }
         #gauge-height-cursor { position: absolute; bottom: 0%; left: 0; width: 100%; height: 4px; background: #fff; z-index: 20; }
         #gauge-bar { width: 100%; height: 36px; background: #111; border: 2px solid #888; border-radius: 18px; position: relative; overflow: hidden; }
         #gauge-power-fill { height: 100%; width: 0%; position: absolute; top: 0; left: 0; background: linear-gradient(to right, #4ade80, #facc15, #ef4444); }
         #gauge-center-line { position: absolute; top: 0; left: 50%; width: 2px; height: 100%; background: rgba(255,255,255,0.8); z-index: 6; }
-        .cursor-indicator { position: absolute; top: 0; height: 100%; width: 6px; background: #fff; z-index: 30; transform: translateX(-50%); }
+        .cursor-indicator { position: absolute; top: 0; height: 100%; width: 6px; background: #fff; z-index: 30; transform: translateX(-50%); border: 1px solid #000; }
+        .cursor-curve { background: #ff0000 !important; box-shadow: 0 0 10px #ff0000 !important; }
+
         #minimap-container { position: absolute; top: 80px; right: 20px; width: 150px; height: 150px; background: #000; border: 3px solid #444; border-radius: 50%; overflow: hidden; z-index: 50; display: none; }
         #minimap-canvas { width: 100%; height: 100%; display: block; }
-        .mobile-controls { display: none; position: absolute; bottom: 30px; z-index: 110; width: 100%; justify-content: space-between; padding: 0 30px; pointer-events: none; }
-        .control-btn { pointer-events: auto; width: 80px; height: 80px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.3); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 28px; color: white; backdrop-filter: blur(8px); transition: 0.1s; }
+        
+        .mobile-controls { display: none; position: absolute; bottom: 30px; z-index: 60; width: 100%; justify-content: space-between; padding: 0 30px; pointer-events: none; }
+        .control-btn { pointer-events: auto; width: 80px; height: 80px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.3); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 28px; color: white; backdrop-filter: blur(8px); transition: 0.1s; user-select: none; }
         .control-btn:active { background: rgba(255,255,255,0.3); transform: scale(0.95); }
         .control-btn.shot-btn { width: 100px; height: 100px; background: linear-gradient(135deg, rgba(234, 179, 8, 0.3), rgba(234, 179, 8, 0.5)); border-color: #facc15; font-weight: 900; font-size: 20px; color: #fef08a; }
+        
+        #item-slots { position: absolute; top: 240px; right: 20px; display: none; flex-direction: column; gap: 8px; z-index: 40; }
+        .item-box { width: 50px; height: 50px; background: rgba(0,0,0,0.6); border: 1px solid #444; border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; cursor: pointer; font-size: 10px; pointer-events: auto; }
         
         #loader { position: fixed; inset: 0; background: #020617; z-index: 200; display: flex; justify-content: center; align-items: center; color: white; flex-direction: column; }
         .spinner { width: 50px; height: 50px; border: 5px solid #1e293b; border-top: 5px solid #3b82f6; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 20px; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        /* P2P UI */
-        #p2p-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 150; display: none; justify-content: center; align-items: center; flex-direction: column; }
+        #p2p-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.95); z-index: 150; display: none; justify-content: center; align-items: center; flex-direction: column; }
         #room-code-display { font-size: 40px; font-weight: 900; color: #4ade80; letter-spacing: 5px; margin: 20px 0; font-family: 'Orbitron'; cursor: pointer; }
         #copy-msg { font-size: 12px; color: #888; margin-bottom: 20px; }
         .p2p-box { background: #1e293b; padding: 30px; border-radius: 20px; border: 1px solid #475569; text-align: center; width: 90%; max-width: 400px; }
@@ -57,57 +68,74 @@
 
     <div id="loader">
         <div class="spinner"></div>
-        <p class="font-sci tracking-widest text-blue-400">INITIALIZING P2P MODULE...</p>
+        <p class="font-sci tracking-widest text-blue-400">LOADING 300 PLANETS...</p>
     </div>
 
-    <div id="multi-status">🟢 CONNECTED: 2 Players</div>
+    <div id="multi-status">🟢 ONLINE</div>
 
     <!-- 로비 -->
     <div id="lobby-screen" class="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/90 backdrop-blur-md fade-in hidden">
         <div class="text-center mb-8 mt-10 relative">
-            <h1 class="text-5xl md:text-7xl font-black text-transparent bg-clip-text bg-gradient-to-br from-white to-slate-400 font-sci mb-2">
+            <h1 class="relative text-5xl md:text-7xl font-black text-transparent bg-clip-text bg-gradient-to-br from-white to-slate-400 font-sci mb-2 tracking-tighter">
                 GRAVITY<span class="text-blue-500">GOLF</span>
             </h1>
-            <p class="text-slate-400 text-sm font-sci tracking-[0.5em]">P2P MULTIPLAYER v0.1.4</p>
+            <p class="relative text-slate-400 text-sm md:text-lg font-sci tracking-[0.5em] opacity-80">UNIVERSE v0.1.10 (REAL DATA)</p>
         </div>
         
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-4xl px-6 pb-10 overflow-y-auto" style="max-height: 65vh;">
             <button onclick="GameApp.selectMode('SPEED')" class="btn-menu p-6 rounded-2xl flex items-center gap-5 group">
                 <div class="text-4xl">⚡</div>
-                <div class="text-left"><h3 class="text-xl font-bold font-sci text-yellow-400">SPEED RUSH</h3><p class="text-xs text-slate-300">Single Player</p></div>
+                <div class="text-left"><h3 class="text-xl font-bold font-sci text-yellow-400">SPEED RUSH</h3><p class="text-xs text-slate-300">Time Attack</p></div>
             </button>
             <button onclick="GameApp.selectMode('CASUAL')" class="btn-menu p-6 rounded-2xl flex items-center gap-5 group">
                 <div class="text-4xl">🎒</div>
-                <div class="text-left"><h3 class="text-xl font-bold font-sci text-green-400">CASUAL</h3><p class="text-xs text-slate-300">Free Roam</p></div>
+                <div class="text-left"><h3 class="text-xl font-bold font-sci text-green-400">CASUAL TOUR</h3><p class="text-xs text-slate-300">Relaxed Mode</p></div>
             </button>
-            <button onclick="GameApp.openP2P('HOST')" class="btn-menu p-6 rounded-2xl flex items-center gap-5 group bg-blue-900/20 border-blue-500/50">
-                <div class="text-4xl">🏠</div>
-                <div class="text-left"><h3 class="text-xl font-bold font-sci text-blue-400">CREATE ROOM</h3><p class="text-xs text-slate-300">Host Game</p></div>
+            <button onclick="GameApp.selectMode('CHALLENGE')" class="btn-menu p-6 rounded-2xl flex items-center gap-5 group">
+                <div class="text-4xl">🏆</div>
+                <div class="text-left"><h3 class="text-xl font-bold font-sci text-red-400">CHALLENGE</h3><p class="text-xs text-slate-300">5-Hole Run</p></div>
             </button>
-            <button onclick="GameApp.openP2P('JOIN')" class="btn-menu p-6 rounded-2xl flex items-center gap-5 group bg-purple-900/20 border-purple-500/50">
-                <div class="text-4xl">🚀</div>
-                <div class="text-left"><h3 class="text-xl font-bold font-sci text-purple-400">JOIN ROOM</h3><p class="text-xs text-slate-300">Enter Code</p></div>
+            <button onclick="GameApp.showMultiOptions()" class="btn-menu p-6 rounded-2xl flex items-center gap-5 group bg-blue-900/20 border-blue-500/50">
+                <div class="text-4xl">🌍</div>
+                <div class="text-left"><h3 class="text-xl font-bold font-sci text-blue-400">MULTIPLAYER</h3><p class="text-xs text-slate-300">VS AI / Friend</p></div>
             </button>
         </div>
     </div>
 
-    <!-- P2P 모달 -->
-    <div id="p2p-modal">
-        <!-- 호스트 화면 -->
+    <!-- 멀티플레이 모달 -->
+    <div id="p2p-modal" class="hidden">
+        <div id="multi-select" class="p2p-box">
+            <h2 class="text-2xl font-bold font-sci mb-6 text-blue-400">SELECT MODE</h2>
+            <button onclick="GameApp.startBotMatch()" class="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-4 rounded-xl mb-4">
+                🤖 VS CPU <span class="text-xs font-normal block text-green-200">Instant Match</span>
+            </button>
+            <button onclick="GameApp.showP2POptions()" class="w-full bg-purple-600 hover:bg-purple-500 text-white font-bold py-4 rounded-xl mb-4">
+                🤝 VS FRIEND <span class="text-xs font-normal block text-purple-200">Room Code</span>
+            </button>
+            <button onclick="GameApp.closeP2P()" class="text-slate-400 text-sm mt-2 hover:text-white">CANCEL</button>
+        </div>
+
+        <div id="p2p-options" class="p2p-box hidden">
+            <h2 class="text-2xl font-bold font-sci mb-6 text-purple-400">P2P CONNECT</h2>
+            <div class="flex gap-4">
+                <button onclick="GameApp.openP2P('HOST')" class="flex-1 bg-slate-700 hover:bg-slate-600 py-6 rounded-xl font-bold">🏠 HOST</button>
+                <button onclick="GameApp.openP2P('JOIN')" class="flex-1 bg-slate-700 hover:bg-slate-600 py-6 rounded-xl font-bold">🚀 JOIN</button>
+            </div>
+            <button onclick="GameApp.backToMultiSelect()" class="text-slate-400 text-sm mt-4 hover:text-white">BACK</button>
+        </div>
+
         <div id="p2p-host" class="p2p-box hidden">
-            <h2 class="text-2xl font-bold font-sci mb-2">WAITING FOR PLAYER</h2>
-            <p class="text-slate-400 text-sm">Share this code with your friend:</p>
+            <h2 class="text-xl font-bold font-sci mb-2">YOUR ROOM CODE</h2>
             <div id="room-code-display" onclick="GameApp.copyCode()">-----</div>
-            <p id="copy-msg">Click code to copy</p>
-            <div class="animate-pulse text-yellow-400 text-sm mt-4">Waiting for connection...</div>
+            <p id="copy-msg">Click to copy</p>
+            <div class="animate-pulse text-yellow-400 text-sm mt-4">Waiting for friend...</div>
             <button onclick="GameApp.closeP2P()" class="mt-6 px-6 py-2 bg-slate-700 rounded-lg hover:bg-slate-600">CANCEL</button>
         </div>
 
-        <!-- 조인 화면 -->
         <div id="p2p-join" class="p2p-box hidden">
-            <h2 class="text-2xl font-bold font-sci mb-4">JOIN GAME</h2>
-            <input type="text" id="room-code-input" placeholder="ENTER ROOM CODE" class="w-full bg-black/50 border border-slate-500 p-4 text-center text-2xl font-sci text-white rounded-lg mb-4 focus:border-blue-500 outline-none uppercase" maxlength="5">
-            <button onclick="GameApp.connectToPeer()" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-lg mb-2">CONNECT 🚀</button>
+            <h2 class="text-xl font-bold font-sci mb-4">ENTER CODE</h2>
+            <input type="text" id="room-code-input" placeholder="CODE" class="w-full bg-black/50 border border-slate-500 p-4 text-center text-2xl font-sci text-white rounded-lg mb-4 focus:border-blue-500 outline-none uppercase">
+            <button onclick="GameApp.connectToPeer()" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-lg mb-2">CONNECT</button>
             <button onclick="GameApp.closeP2P()" class="w-full bg-slate-700 hover:bg-slate-600 text-white font-bold py-3 rounded-lg">CANCEL</button>
         </div>
     </div>
@@ -127,7 +155,6 @@
             <div class="text-[10px] text-slate-400 font-bold tracking-widest">STROKES</div>
         </div>
 
-        <!-- 게이지 -->
         <div id="gauge-container-group" class="pointer-events-auto">
             <div id="gauge-height-wrapper">
                 <div class="absolute top-2 w-full text-center text-[8px] font-bold text-white/50 z-20">ANG</div>
@@ -145,6 +172,12 @@
         </div>
 
         <div id="minimap-container"><canvas id="minimap-canvas"></canvas></div>
+
+        <div id="item-slots" class="pointer-events-auto">
+            <div class="item-box" onclick="GameApp.useItem('POWER')"><span class="text-xl">⚡</span><span class="text-[8px]">PWR</span></div>
+            <div class="item-box" onclick="GameApp.useItem('GUIDE')"><span class="text-xl">👁️</span><span class="text-[8px]">AIM</span></div>
+            <div class="item-box" onclick="GameApp.useItem('BRAKE')"><span class="text-xl">⚓</span><span class="text-[8px]">STOP</span></div>
+        </div>
 
         <div class="mobile-controls flex" id="mobile-controls">
             <div class="flex gap-4 items-end pb-4">
@@ -169,37 +202,84 @@
     <div id="canvas-container" class="absolute inset-0 z-0"></div>
 
     <script>
-        // ==========================================
-        // 1. Planet DB
-        // ==========================================
+        // --- 1. 안전 부팅 ---
+        setTimeout(function() {
+            const loader = document.getElementById('loader');
+            if(loader && !loader.classList.contains('hidden')) {
+                console.warn("Force Booting...");
+                loader.classList.add('hidden');
+                document.getElementById('lobby-screen').classList.remove('hidden');
+            }
+        }, 3500);
+
+        // --- 2. Planet DB (Real + Procedural) ---
         const PlanetDB = (() => {
+            const colors = {
+                EARTH: 0x4ade80, MARS: 0xc2410c, MOON: 0x94a3b8, ICE: 0xbfdbfe, LAVA: 0x7f1d1d
+            };
+            
+            // Real Planets (Hardcoded ~30 samples)
+            const realPlanets = [
+                {n:"Mercury", g:0.38, c:colors.MOON}, {n:"Venus", g:0.90, c:colors.LAVA}, {n:"Earth", g:1.00, c:colors.EARTH},
+                {n:"Mars", g:0.38, c:colors.MARS}, {n:"Jupiter", g:2.53, c:colors.LAVA}, {n:"Saturn", g:1.06, c:colors.LAVA},
+                {n:"Uranus", g:0.89, c:colors.ICE}, {n:"Neptune", g:1.14, c:colors.ICE}, {n:"Pluto", g:0.06, c:colors.MOON},
+                {n:"Moon", g:0.16, c:colors.MOON}, {n:"Titan", g:0.14, c:colors.LAVA}, {n:"Europa", g:0.13, c:colors.ICE},
+                {n:"Ganymede", g:0.15, c:colors.MOON}, {n:"Callisto", g:0.12, c:colors.MOON}, {n:"Io", g:0.18, c:colors.LAVA},
+                {n:"Proxima b", g:1.05, c:colors.MARS}, {n:"TRAPPIST-1d", g:0.48, c:colors.EARTH}, {n:"TRAPPIST-1e", g:0.93, c:colors.EARTH},
+                {n:"Kepler-22b", g:1.80, c:colors.EARTH}, {n:"Kepler-452b", g:2.00, c:colors.EARTH}, {n:"Gliese 581g", g:1.40, c:colors.MARS},
+                {n:"55 Cancri e", g:2.20, c:colors.LAVA}, {n:"WASP-12b", g:1.10, c:colors.LAVA}, {n:"HD 209458 b", g:0.94, c:colors.LAVA},
+                {n:"LHS 1140 b", g:2.30, c:colors.MARS}, {n:"Ross 128 b", g:1.12, c:colors.EARTH}, {n:"CoRoT-7b", g:1.60, c:colors.LAVA},
+                {n:"K2-18b", g:1.30, c:colors.ICE}, {n:"TOI-700 d", g:0.90, c:colors.EARTH}, {n:"Kepler-62f", g:1.40, c:colors.ICE}
+            ];
+
             const planets = [];
-            for(let i=0; i<300; i++) {
+            
+            // 1. Add Real
+            realPlanets.forEach((p, i) => {
                 const mapSize = 4000;
                 const pathPoints = [new THREE.Vector3(0,0,mapSize/2-200)];
                 const segments = 4;
                 for(let j=1; j<segments; j++) pathPoints.push(new THREE.Vector3((Math.random()-0.5)*2000, 0, (mapSize/2-200) - ((mapSize-400)*(j/segments))));
                 pathPoints.push(new THREE.Vector3(0,0,-(mapSize/2-200)));
                 planets.push({
-                    id: i, name: `Planet-${i+1}`, gravity: 0.3 + (Math.random()*1.2), par: 3, color: 0x4ade80,
+                    id: i, name: p.n, gravity: p.g, par: 3 + Math.floor(p.g), color: p.c,
+                    pathPoints, startPos: pathPoints[0], holePos: pathPoints[pathPoints.length-1], width: 150 
+                });
+            });
+
+            // 2. Fill Rest (Procedural)
+            const prefixes = ["Kepler", "TOI", "HD", "GJ", "K2", "WASP"];
+            const cols = Object.values(colors);
+            for(let i=realPlanets.length; i<300; i++) {
+                const mapSize = 4000;
+                const pathPoints = [new THREE.Vector3(0,0,mapSize/2-200)];
+                const segments = 4;
+                for(let j=1; j<segments; j++) pathPoints.push(new THREE.Vector3((Math.random()-0.5)*2000, 0, (mapSize/2-200) - ((mapSize-400)*(j/segments))));
+                pathPoints.push(new THREE.Vector3(0,0,-(mapSize/2-200)));
+                
+                const g = 0.2 + Math.random()*2.0;
+                const name = `${prefixes[i%prefixes.length]}-${Math.floor(Math.random()*2000)} ${String.fromCharCode(98+i%5)}`;
+                planets.push({
+                    id: i, name: name, gravity: parseFloat(g.toFixed(2)), par: 3, color: cols[i%cols.length],
                     pathPoints, startPos: pathPoints[0], holePos: pathPoints[pathPoints.length-1], width: 150 
                 });
             }
+
             return {
                 get: (id) => planets[id%300],
-                getRandom: () => planets[Math.floor(Math.random()*planets.length)]
+                getRandom: () => planets[Math.floor(Math.random()*planets.length)],
+                getFiveRandom: () => { const s=[...planets].sort(()=>0.5-Math.random()); return s.slice(0,5); }
             };
         })();
 
-        // ==========================================
-        // 2. Game App & P2P Logic
-        // ==========================================
-        const GameApp = {
+        // GLOBAL OBJECT
+        window.GameApp = {
             state: 'LOBBY', mode: null, currentStage: null, 
             peer: null, conn: null, myId: null, isHost: false,
+            bots: [], botInterval: null,
 
             init() {
-                ThreeScene.init();
+                try { ThreeScene.init(); } catch(e) { console.error("3D Init Error", e); }
                 this.updateUI();
                 this.setupTouchControls();
                 document.getElementById('loader').classList.add('hidden');
@@ -211,27 +291,38 @@
                 
                 ['left','right'].forEach(dir => {
                     const btn = document.getElementById(`btn-${dir}`);
-                    btn.addEventListener('touchstart', e=>{ prevent(e); press(dir==='left'?'a':'d', true); });
+                    btn.addEventListener('touchstart', e=>{ prevent(e); press(dir==='left'?'a':'d', true); }, {passive:false});
                     btn.addEventListener('touchend', e=>{ prevent(e); press(dir==='left'?'a':'d', false); });
                     btn.addEventListener('mousedown', ()=>press(dir==='left'?'a':'d', true));
                     btn.addEventListener('mouseup', ()=>press(dir==='left'?'a':'d', false));
                 });
                 
                 const shot = document.getElementById('btn-shot');
-                shot.addEventListener('touchstart', e=>{ prevent(e); ThreeScene.triggerSpace(); shot.style.transform='scale(0.9)'; });
+                shot.addEventListener('touchstart', e=>{ prevent(e); ThreeScene.triggerSpace(); shot.style.transform='scale(0.9)'; }, {passive:false});
                 shot.addEventListener('touchend', e=>{ prevent(e); shot.style.transform='scale(1)'; });
                 shot.addEventListener('mousedown', ()=>{ ThreeScene.triggerSpace(); shot.style.transform='scale(0.9)'; });
                 shot.addEventListener('mouseup', ()=>{ shot.style.transform='scale(1)'; });
             },
 
             updateUI() {
-                ['lobby-screen','in-game-ui','result-screen','p2p-modal'].forEach(id => document.getElementById(id).classList.add('hidden'));
-                if (this.state === 'LOBBY') document.getElementById('lobby-screen').classList.remove('hidden');
+                ['lobby-screen','in-game-ui','result-screen','p2p-modal'].forEach(id => {
+                    const el = document.getElementById(id);
+                    if(el) { el.classList.add('hidden'); el.style.display = 'none'; }
+                });
+                
+                if (this.state === 'LOBBY') {
+                    const l = document.getElementById('lobby-screen');
+                    l.classList.remove('hidden'); l.style.display = 'flex';
+                }
                 else if (this.state === 'IN_GAME') {
-                    document.getElementById('in-game-ui').classList.remove('hidden');
+                    const g = document.getElementById('in-game-ui');
+                    g.classList.remove('hidden'); g.style.display = 'block';
                     document.querySelector('.mobile-controls').style.display = 'flex';
                 }
-                else if (this.state === 'RESULT') document.getElementById('result-screen').classList.remove('hidden');
+                else if (this.state === 'RESULT') {
+                    const r = document.getElementById('result-screen');
+                    r.classList.remove('hidden'); r.style.display = 'flex';
+                }
             },
 
             selectMode(mode) {
@@ -239,14 +330,63 @@
                 this.startGame(PlanetDB.getRandom());
             },
 
-            // --- P2P Methods ---
-            openP2P(type) {
-                document.getElementById('p2p-modal').style.display = 'flex';
+            showMultiOptions() {
+                const m = document.getElementById('p2p-modal');
+                m.classList.remove('hidden');
+                m.style.display = 'flex'; // Force Flex
+                
+                document.getElementById('multi-select').classList.remove('hidden');
+                document.getElementById('p2p-options').classList.add('hidden');
                 document.getElementById('p2p-host').classList.add('hidden');
                 document.getElementById('p2p-join').classList.add('hidden');
+            },
+            
+            backToMultiSelect() {
+                document.getElementById('multi-select').classList.remove('hidden');
+                document.getElementById('p2p-options').classList.add('hidden');
+            },
+
+            showP2POptions() {
+                document.getElementById('multi-select').classList.add('hidden');
+                document.getElementById('p2p-options').classList.remove('hidden');
+            },
+
+            startBotMatch() {
+                this.closeP2P();
+                this.mode = 'BOT_MATCH';
+                this.startGame(PlanetDB.getRandom());
+                this.bots = [ { id:'b1', pos:new THREE.Vector3() }, { id:'b2', pos:new THREE.Vector3() }, { id:'b3', pos:new THREE.Vector3() } ];
+                const s = this.currentStage.startPos;
+                this.bots.forEach(b => b.pos.set(s.x, 2, s.z));
+                document.getElementById('multi-status').style.display = 'block';
+                document.getElementById('multi-status').innerText = "🟢 VS CPU (3 Bots)";
+                if(this.botInterval) clearInterval(this.botInterval);
+                this.botInterval = setInterval(() => this.updateBots(), 50);
+            },
+
+            updateBots() {
+                if(this.state !== 'IN_GAME') return;
+                this.bots.forEach(bot => {
+                    const hole = this.currentStage.holePos;
+                    const dir = new THREE.Vector3(hole.x - bot.pos.x, 0, hole.z - bot.pos.z).normalize();
+                    const dist = bot.pos.distanceTo(new THREE.Vector3(hole.x, bot.pos.y, hole.z));
+                    if(dist > 10) { bot.pos.add(dir.multiplyScalar(5.0)); bot.pos.y = 10; }
+                });
+                const botMap = {};
+                this.bots.forEach(b => botMap[b.id] = { x:b.pos.x, y:b.pos.y, z:b.pos.z });
+                ThreeScene.updateRemotePlayers(botMap, 'me');
+            },
+
+            openP2P(type) {
+                if (typeof Peer === 'undefined') {
+                    alert("P2P Library not loaded. Starting VS CPU instead.");
+                    this.startBotMatch();
+                    return;
+                }
                 
+                document.getElementById('p2p-options').classList.add('hidden');
                 if(!this.peer) {
-                    this.peer = new Peer(null, { debug: 2 }); // Random ID
+                    this.peer = new Peer(null, { debug: 1 }); 
                     this.peer.on('open', (id) => {
                         this.myId = id;
                         if(type === 'HOST') this.setupHost();
@@ -258,70 +398,43 @@
                 } else {
                     if(type === 'HOST') this.setupHost();
                 }
-                
                 if(type === 'JOIN') document.getElementById('p2p-join').classList.remove('hidden');
             },
 
             setupHost() {
                 this.isHost = true;
                 document.getElementById('p2p-host').classList.remove('hidden');
-                // Use last 5 chars as code for simplicity (Collision possible but low for demo)
-                const code = this.myId.substr(-5).toUpperCase();
-                document.getElementById('room-code-display').innerText = code;
+                document.getElementById('room-code-display').innerText = this.myId; 
+                document.getElementById('room-code-display').style.fontSize = "16px";
             },
 
             connectToPeer() {
                 const code = document.getElementById('room-code-input').value.trim();
                 if(code.length < 5) return alert("Invalid Code");
-                
-                // Hack: We need full ID. In real app, use matchmaking server or full ID.
-                // Here we assume players are exchanging full IDs or we use a deterministic ID prefix.
-                // For this prototype, we ask user to input FULL ID if 5 chars fails? 
-                // Let's rely on manual ID entry for robustness or basic peerjs functionality.
-                // Wait, PeerJS IDs are long. Let's just alert the Full ID to the user for now.
-                // Better: The host sees the full ID.
-                // Update: Let's just use the Input value as the Peer ID.
-                
-                // User enters the FULL ID they saw on host screen (We will show full ID)
                 this.isHost = false;
-                this.conn = this.peer.connect(code); // Connect to peer
+                this.conn = this.peer.connect(code); 
                 this.setupConnection();
-            },
-            
-            // Override setupHost to show full ID because partial ID lookup needs a server
-            setupHost() {
-                this.isHost = true;
-                document.getElementById('p2p-host').classList.remove('hidden');
-                document.getElementById('room-code-display').innerText = this.myId; // Show Full ID
-                document.getElementById('room-code-display').style.fontSize = "16px";
             },
 
             setupConnection() {
                 this.conn.on('open', () => {
-                    document.getElementById('p2p-modal').style.display = 'none';
+                    this.closeP2P();
                     document.getElementById('multi-status').style.display = 'block';
-                    
+                    document.getElementById('multi-status').innerText = "🟢 P2P CONNECTED";
                     if(this.isHost) {
-                        // Host selects map and sends to guest
                         const pid = Math.floor(Math.random()*300);
                         this.conn.send({ type: 'START', planetId: pid });
                         this.startGame(PlanetDB.get(pid));
                     }
                 });
-
                 this.conn.on('data', (data) => {
-                    if(data.type === 'START') {
-                        this.startGame(PlanetDB.get(data.planetId));
-                    }
-                    if(data.type === 'POS') {
-                        ThreeScene.updateRemoteBall(data.pos);
-                    }
+                    if(data.type === 'START') this.startGame(PlanetDB.get(data.planetId));
+                    if(data.type === 'POS') ThreeScene.updateRemoteBall(data.pos);
                 });
             },
 
             closeP2P() {
                 document.getElementById('p2p-modal').style.display = 'none';
-                if(this.conn) this.conn.close();
             },
             
             copyCode() {
@@ -339,29 +452,46 @@
             startGame(stageData) {
                 this.state = 'IN_GAME';
                 this.currentStage = stageData;
+                const itemEl = document.getElementById('item-slots');
+                if(itemEl) itemEl.style.display = (this.mode === 'CASUAL') ? 'flex' : 'none';
                 this.updateUI();
+                this.startTime = Date.now();
+                if(this.timerInterval) clearInterval(this.timerInterval);
+                this.timerInterval = setInterval(()=>{
+                    const d = Date.now()-this.startTime;
+                    const m = Math.floor(d/60000).toString().padStart(2,'0');
+                    const s = Math.floor((d%60000)/1000).toString().padStart(2,'0');
+                    const tEl = document.getElementById('hud-timer');
+                    if(tEl) tEl.innerText = `${m}:${s}`;
+                }, 100);
                 ThreeScene.initStage(this.currentStage);
             },
 
             finishStage(shots) {
+                clearInterval(this.timerInterval);
                 this.state = 'RESULT';
                 this.updateUI();
                 document.getElementById('res-score').innerText = shots;
+                if(this.botInterval) clearInterval(this.botInterval);
             },
 
-            returnToLobby() { this.state = 'LOBBY'; this.updateUI(); },
+            returnToLobby() { 
+                this.state = 'LOBBY'; 
+                if(this.botInterval) clearInterval(this.botInterval);
+                document.getElementById('multi-status').style.display='none';
+                this.updateUI(); 
+            },
+            useItem(type) { if(this.mode==='CASUAL' && this.items[type]>0) { ThreeScene.useItem(type); this.items[type]--; } }
         };
 
-        // ==========================================
-        // 3. Three.js Scene
-        // ==========================================
+        // --- Three.js ---
         const ThreeScene = (() => {
             let scene, camera, renderer, ball, terrainMesh;
             let gaugeState=0, gaugeVals={p:0,h:0,c:0}, gaugeAnim={pos:0,dir:1};
             let physics={vel:new THREE.Vector3(), moving:false};
-            let stageData, aimAngle=0, orbitAngle=0, shots=0;
+            let stageData, aimAngle=0, orbitAngle=0, shots=0, itemActive=null;
             let miniCtx, minimapBg, keys={a:false, d:false};
-            let remoteBall; 
+            let remoteBall, pathLut=[], remoteMeshes={}; 
 
             function init() {
                 const container = document.getElementById('canvas-container');
@@ -379,8 +509,6 @@
                 sun.shadow.mapSize.set(2048,2048);
                 sun.shadow.camera.far=5000; sun.shadow.camera.left=-2000; sun.shadow.camera.right=2000; sun.shadow.camera.top=2000; sun.shadow.camera.bottom=-2000;
                 scene.add(sun);
-                
-                // Stars
                 const sg = new THREE.BufferGeometry(); const sp = [];
                 for(let i=0; i<3000; i++) sp.push((Math.random()-0.5)*8000, (Math.random()-0.5)*4000+2000, (Math.random()-0.5)*8000);
                 sg.setAttribute('position', new THREE.Float32BufferAttribute(sp,3));
@@ -390,7 +518,6 @@
                 if(mc) { miniCtx = mc.getContext('2d'); mc.width=300; mc.height=300; }
 
                 animate();
-                
                 window.addEventListener('resize', ()=>{ camera.aspect=window.innerWidth/window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); });
                 window.addEventListener('keydown', (e) => {
                     if(e.code==='Space') triggerSpace();
@@ -416,6 +543,19 @@
                 remoteBall.position.set(pos.x, pos.y, pos.z);
             }
 
+            function updateRemotePlayers(players, myUid) {
+                for(let uid in remoteMeshes) { if(!players[uid]) { scene.remove(remoteMeshes[uid]); delete remoteMeshes[uid]; } }
+                for(let uid in players) {
+                    if(uid === myUid) continue;
+                    const p = players[uid];
+                    if(!remoteMeshes[uid]) {
+                        const m = new THREE.Mesh(new THREE.SphereGeometry(2,16,16), new THREE.MeshBasicMaterial({color:0x00ffff, wireframe:true}));
+                        scene.add(m); remoteMeshes[uid] = m;
+                    }
+                    remoteMeshes[uid].position.set(p.x, p.y, p.z);
+                }
+            }
+
             function initStage(data) {
                 if(!scene) init();
                 stageData = data; shots=0; physics.vel.set(0,0,0); physics.moving=false; gaugeState=0;
@@ -423,6 +563,7 @@
                 document.getElementById('hud-planet-name').innerText = data.name;
                 document.getElementById('hud-planet-info').innerText = `${data.gravity.toFixed(2)}g | Par ${data.par}`;
                 document.getElementById('hud-shots').innerText = 0;
+                
                 document.getElementById('gauge-container-group').style.display = 'flex';
                 document.getElementById('gauge-container-group').classList.remove('hidden');
                 document.getElementById('minimap-container').style.display = 'block';
@@ -431,19 +572,19 @@
                 if(terrainMesh) { scene.remove(terrainMesh); terrainMesh.geometry.dispose(); }
                 if(ball) scene.remove(ball);
                 if(remoteBall) { scene.remove(remoteBall); remoteBall=null; }
+                for(let k in remoteMeshes) { scene.remove(remoteMeshes[k]); } remoteMeshes={};
 
-                // Terrain
                 const mapSize=4000, seg=150;
                 const geo=new THREE.PlaneGeometry(mapSize,mapSize,seg,seg); geo.rotateX(-Math.PI/2);
                 const pos=geo.attributes.position; const colors=[];
                 const curve=new THREE.CatmullRomCurve3(data.pathPoints);
-                const lut=curve.getSpacedPoints(150); 
+                pathLut=curve.getSpacedPoints(150); 
 
                 for(let i=0; i<pos.count; i++){
                     const x=pos.getX(i), z=pos.getZ(i);
                     let minD=Infinity;
-                    for(let k=0; k<lut.length; k+=3) { 
-                        const d = (x-lut[k].x)**2 + (z-lut[k].z)**2;
+                    for(let k=0; k<pathLut.length; k+=3) { 
+                        const d = (x-pathLut[k].x)**2 + (z-pathLut[k].z)**2;
                         if(d<minD) minD=d;
                     }
                     minD = Math.sqrt(minD);
@@ -517,6 +658,19 @@
                         physics.vel.y -= (9.8*stageData.gravity)*stepDt;
                         let nextPos = ball.position.clone().add(physics.vel.clone().multiplyScalar(stepDt*20.0));
                         
+                        // FIX: Variable Shadowing Fixed
+                        let closestPt = pathLut[0];
+                        let minDistSq = Infinity;
+                        for(let k=0; k<pathLut.length; k+=5) {
+                            const d = (nextPos.x-pathLut[k].x)**2 + (nextPos.z-pathLut[k].z)**2;
+                            if(d < minDistSq) { minDistSq = d; closestPt = pathLut[k]; }
+                        }
+                        if(Math.sqrt(minDistSq) > stageData.width * 2.5) {
+                            physics.vel.x *= -0.5; physics.vel.z *= -0.5;
+                            const pushDir = new THREE.Vector3().subVectors(closestPt, nextPos).normalize();
+                            nextPos.add(pushDir.multiplyScalar(10));
+                        }
+
                         const gy = getTerrainHeight(nextPos.x, nextPos.z);
                         if(nextPos.y <= gy+2) {
                             nextPos.y = gy+2;
@@ -561,7 +715,7 @@
                 gaugeState=0; shots++;
                 document.getElementById('hud-shots').innerText=shots;
                 document.getElementById('gauge-container-group').style.display='none';
-                let p = gaugeVals.p/100 * 85; 
+                let p = gaugeVals.p/100 * 60; // Power Nerf: 60
                 const ang = (15 + (gaugeVals.h/100)*60) * (Math.PI/180);
                 const cur = gaugeVals.c*0.5;
                 const fa = aimAngle+cur;
@@ -596,14 +750,30 @@
 
             function drawMinimap() {
                 if(!miniCtx || !stageData) return;
-                miniCtx.fillStyle='#000'; miniCtx.fillRect(0,0,300,300);
-                // Draw path...
+                const size = 300;
+                miniCtx.fillStyle='#000'; miniCtx.fillRect(0,0,size,size);
+                
+                // Draw Path
+                if(pathLut && pathLut.length > 0) {
+                    miniCtx.lineWidth = 20;
+                    miniCtx.lineCap = 'round';
+                    miniCtx.strokeStyle = '#22c55e'; // Green fairway
+                    miniCtx.beginPath();
+                    const mapScale = size / 4000; const offset = 2000;
+                    pathLut.forEach((pt, i) => {
+                        const mx = (pt.x + offset) * mapScale;
+                        const my = (pt.z + offset) * mapScale;
+                        if(i===0) miniCtx.moveTo(mx, my); else miniCtx.lineTo(mx, my);
+                    });
+                    miniCtx.stroke();
+                }
+
                 const mapScale = 300 / 4000; const offset = 2000;
                 const sx=(stageData.startPos.x+offset)*mapScale; const sz=(stageData.startPos.z+offset)*mapScale;
                 const hx=(stageData.holePos.x+offset)*mapScale; const hz=(stageData.holePos.z+offset)*mapScale;
                 miniCtx.fillStyle='#fff'; miniCtx.beginPath(); miniCtx.arc(sx,sz,4,0,Math.PI*2); miniCtx.fill();
                 miniCtx.fillStyle='#ef4444'; miniCtx.beginPath(); miniCtx.arc(hx,hz,6,0,Math.PI*2); miniCtx.fill();
-                minimapBg=miniCtx.getImageData(0,0,300,300);
+                minimapBg=miniCtx.getImageData(0,0,size,size);
             }
             function updateMinimap() {
                 if(!minimapBg || !miniCtx) return;
@@ -612,15 +782,23 @@
                 const bx=(ball.position.x+offset)*mapScale; const bz=(ball.position.z+offset)*mapScale;
                 miniCtx.fillStyle='#fff'; miniCtx.beginPath(); miniCtx.arc(bx,bz,3,0,Math.PI*2); miniCtx.fill();
                 
-                // Remote
                 if(remoteBall) {
                     const rx=(remoteBall.position.x+offset)*mapScale; const rz=(remoteBall.position.z+offset)*mapScale;
                     miniCtx.fillStyle='#0ff'; miniCtx.beginPath(); miniCtx.arc(rx,rz,2,0,Math.PI*2); miniCtx.fill();
                 }
+                
+                for(let uid in remoteMeshes) {
+                    const rm = remoteMeshes[uid].position;
+                    const rx=(rm.x+offset)*mapScale; const rz=(rm.z+offset)*mapScale;
+                    miniCtx.fillStyle='#0ff'; miniCtx.beginPath(); miniCtx.arc(rx,rz,2,0,Math.PI*2); miniCtx.fill();
+                }
             }
 
+            function stopBall() { if(physics.moving) { physics.vel.set(0,0,0); physics.moving=false; checkWin(); }}
+            function useItem(t) { if(t==='BRAKE') stopBall(); if(t==='POWER') itemActive='POWER'; }
             function setKey(k,v) { keys[k]=v; }
-            return { init, initStage, resetBall, setKey, triggerSpace, updateRemoteBall };
+
+            return { init, initStage, resetBall, setKey, triggerSpace, useItem, updateRemoteBall, updateRemotePlayers };
         })();
 
         window.onload = () => GameApp.init();
